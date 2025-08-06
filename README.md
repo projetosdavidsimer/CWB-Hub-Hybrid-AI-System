@@ -1,5 +1,8 @@
 # CWB Hub Hybrid AI System
 
+**Criado por: David Simer**  
+*O Criador do CWB Hub Hybrid AI System*
+
 Sistema de Inteligência Artificial Híbrida que incorpora simultaneamente a consciência, expertise e personalidade de 8 profissionais sênior da CWB Hub.
 
 ## 🧠 Conceito
