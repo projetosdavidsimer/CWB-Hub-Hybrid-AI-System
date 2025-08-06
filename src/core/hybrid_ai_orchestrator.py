@@ -176,7 +176,7 @@ class HybridAIOrchestrator:
         for agent_id, analysis in zip(relevant_agents, analyses):
             response = AgentResponse(
                 agent_id=agent_id,
-                agent_name=self.agents[agent_id].name,
+                agent_name=self.agents[agent_id].profile.name,
                 phase=ProcessPhase.ANALYSIS,
                 content=analysis,
                 confidence=0.8,  # Será calculado dinamicamente no futuro
