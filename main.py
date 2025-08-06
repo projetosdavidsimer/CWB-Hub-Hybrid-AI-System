@@ -118,22 +118,29 @@ def run_example():
 
 
 if __name__ == "__main__":
+    # Set UTF-8 encoding for console output
+    import sys
+    import io
+    if sys.platform == "win32":
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    
     print("""
-    ╔══════════════════════════════════════════════════════════════╗
-    ║                    CWB HUB HYBRID AI                         ║
-    ║                                                              ║
-    ║  Sistema de IA Híbrida com 8 Profissionais Sênior          ║
-    ║                                                              ║
-    ║  👩‍💼 Ana Beatriz Costa - CTO                                  ║
-    ║  👨‍💻 Carlos Eduardo Santos - Arquiteto de Software            ║
-    ║  👩‍💻 Sofia Oliveira - Engenheira Full Stack                  ║
-    ║  👨‍📱 Gabriel Mendes - Engenheiro Mobile                       ║
-    ║  👩‍🎨 Isabella Santos - Designer UX/UI                        ║
-    ║  👨‍🔬 Lucas Pereira - Engenheiro de QA                         ║
-    ║  👩‍🔧 Mariana Rodrigues - Engenheira DevOps                   ║
-    ║  👨‍📊 Pedro Henrique Almeida - Agile Project Manager          ║
-    ║                                                              ║
-    ╚══════════════════════════════════════════════════════════════╝
+    ================================================================
+    |                    CWB HUB HYBRID AI                         |
+    |                                                              |
+    |  Sistema de IA Hibrida com 8 Profissionais Senior          |
+    |                                                              |
+    |  Ana Beatriz Costa - CTO                                     |
+    |  Carlos Eduardo Santos - Arquiteto de Software              |
+    |  Sofia Oliveira - Engenheira Full Stack                     |
+    |  Gabriel Mendes - Engenheiro Mobile                          |
+    |  Isabella Santos - Designer UX/UI                           |
+    |  Lucas Pereira - Engenheiro de QA                            |
+    |  Mariana Rodrigues - Engenheira DevOps                      |
+    |  Pedro Henrique Almeida - Agile Project Manager             |
+    |                                                              |
+    ================================================================
     """)
     
     run_example()

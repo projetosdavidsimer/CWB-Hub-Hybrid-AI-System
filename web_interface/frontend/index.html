@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CWB Hub - IA Híbrida Colaborativa</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .agent-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .agent-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            border-color: #667eea;
+        }
+
+        .agent-avatar {
+            font-size: 3rem;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .agent-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .agent-role {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .agent-expertise {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .expertise-tag {
+            background: #f0f2ff;
+            color: #667eea;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .project-form {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .requirements-list {
+            margin-top: 10px;
+        }
+
+        .requirement-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .requirement-item input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 5px;
+        }
+
+        .requirement-item button {
+            background: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 5px 10px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .add-requirement {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .add-requirement:hover {
+            background: #5a67d8;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 18px 40px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            width: 100%;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result {
+            display: none;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+        }
+
+        .result.active {
+            display: block;
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f2ff;
+        }
+
+        .confidence-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        .result-content {
+            line-height: 1.6;
+            color: #444;
+        }
+
+        .result-content h2 {
+            color: #333;
+            margin: 25px 0 15px 0;
+        }
+
+        .result-content h3 {
+            color: #667eea;
+            margin: 20px 0 10px 0;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .feedback-section {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #f0f2ff;
+        }
+
+        .feedback-form {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .feedback-input {
+            flex: 1;
+        }
+
+        .feedback-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .new-project-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .team-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .project-form,
+            .result {
+                padding: 25px;
+            }
+            
+            .feedback-form {
+                flex-direction: column;
+            }
+            
+            .feedback-btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-brain"></i> CWB Hub</h1>
+            <p>Sistema de IA Híbrida com 8 Profissionais Sênior</p>
+            <p><em>Criado por David Simer - O Criador do CWB Hub Hybrid AI System</em></p>
+        </div>
+
+        <div id="team-section">
+            <div class="team-grid" id="team-grid">
+                <!-- Agentes serão carregados dinamicamente -->
+            </div>
+        </div>
+
+        <div class="project-form" id="project-form">
+            <h2 style="margin-bottom: 30px; color: #333; text-align: center;">
+                <i class="fas fa-rocket"></i> Novo Projeto
+            </h2>
+            
+            <form id="project-form-element">
+                <div class="form-group">
+                    <label for="title">Título do Projeto</label>
+                    <input type="text" id="title" name="title" required 
+                           placeholder="Ex: Sistema de Gestão de Restaurante">
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Descrição Detalhada</label>
+                    <textarea id="description" name="description" required 
+                              placeholder="Descreva seu projeto, contexto, objetivos e necessidades..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Requisitos Funcionais</label>
+                    <div class="requirements-list" id="requirements-list">
+                        <div class="requirement-item">
+                            <input type="text" placeholder="Ex: Sistema de pedidos online" required>
+                            <button type="button" onclick="removeRequirement(this)">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="button" class="add-requirement" onclick="addRequirement()">
+                        <i class="fas fa-plus"></i> Adicionar Requisito
+                    </button>
+                </div>
+
+                <div class="form-group">
+                    <label for="urgency">Urgência</label>
+                    <select id="urgency" name="urgency">
+                        <option value="low">Baixa</option>
+                        <option value="medium" selected>Média</option>
+                        <option value="high">Alta</option>
+                        <option value="critical">Crítica</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="budget">Orçamento (Opcional)</label>
+                    <input type="text" id="budget" name="budget" 
+                           placeholder="Ex: R$ 50.000 ou Limitado">
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    <i class="fas fa-paper-plane"></i> Enviar para Equipe CWB Hub
+                </button>
+            </form>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <h3>Equipe CWB Hub Analisando...</h3>
+            <p>8 especialistas colaborando em tempo real</p>
+            <div id="progress-info">
+                <p>⚡ Fase 1: Análise individual dos agentes</p>
+            </div>
+        </div>
+
+        <div class="result" id="result">
+            <div class="result-header">
+                <h2><i class="fas fa-lightbulb"></i> Resposta da Equipe CWB Hub</h2>
+                <div class="confidence-badge" id="confidence">
+                    Confiança: 94.4%
+                </div>
+            </div>
+
+            <div class="stats" id="stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="collaborations">12</div>
+                    <div class="stat-label">Colaborações</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="agents-count">8</div>
+                    <div class="stat-label">Agentes Ativos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="response-time">< 1s</div>
+                    <div class="stat-label">Tempo de Resposta</div>
+                </div>
+            </div>
+
+            <div class="result-content" id="result-content">
+                <!-- Resposta será inserida aqui -->
+            </div>
+
+            <div class="feedback-section">
+                <h3><i class="fas fa-comments"></i> Refinar Solução</h3>
+                <p>Forneça feedback para a equipe iterar e melhorar a proposta:</p>
+                <div class="feedback-form">
+                    <div class="feedback-input">
+                        <textarea id="feedback" placeholder="Ex: Gostei da proposta, mas o orçamento é limitado. Precisamos priorizar as funcionalidades mais importantes..." rows="3"></textarea>
+                    </div>
+                    <button type="button" class="feedback-btn" onclick="submitFeedback()">
+                        <i class="fas fa-sync"></i> Iterar
+                    </button>
+                </div>
+                <button type="button" class="new-project-btn" onclick="newProject()">
+                    <i class="fas fa-plus"></i> Novo Projeto
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSessionId = null;
+        let websocket = null;
+
+        // Carregar agentes na inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAgents();
+            setupForm();
+        });
+
+        async function loadAgents() {
+            try {
+                const response = await fetch('http://localhost:8000/agents');
+                const data = await response.json();
+                
+                const teamGrid = document.getElementById('team-grid');
+                teamGrid.innerHTML = '';
+                
+                data.agents.forEach(agent => {
+                    const agentCard = document.createElement('div');
+                    agentCard.className = 'agent-card';
+                    agentCard.innerHTML = `
+                        <div class="agent-avatar">${agent.avatar}</div>
+                        <div class="agent-name">${agent.name}</div>
+                        <div class="agent-role">${agent.role}</div>
+                        <div class="agent-expertise">
+                            ${agent.expertise.map(skill => `<span class="expertise-tag">${skill}</span>`).join('')}
+                        </div>
+                    `;
+                    teamGrid.appendChild(agentCard);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar agentes:', error);
+            }
+        }
+
+        function setupForm() {
+            const form = document.getElementById('project-form-element');
+            form.addEventListener('submit', handleSubmit);
+        }
+
+        function addRequirement() {
+            const requirementsList = document.getElementById('requirements-list');
+            const newRequirement = document.createElement('div');
+            newRequirement.className = 'requirement-item';
+            newRequirement.innerHTML = `
+                <input type="text" placeholder="Descreva um requisito..." required>
+                <button type="button" onclick="removeRequirement(this)">
+                    <i class="fas fa-trash"></i>
+                </button>
+            `;
+            requirementsList.appendChild(newRequirement);
+        }
+
+        function removeRequirement(button) {
+            const requirementsList = document.getElementById('requirements-list');
+            if (requirementsList.children.length > 1) {
+                button.parentElement.remove();
+            }
+        }
+
+        async function handleSubmit(event) {
+            event.preventDefault();
+            
+            // Mostrar loading
+            document.getElementById('project-form').style.display = 'none';
+            document.getElementById('result').classList.remove('active');
+            document.getElementById('loading').classList.add('active');
+            
+            // Simular progresso
+            simulateProgress();
+            
+            // Coletar dados do formulário
+            const formData = new FormData(event.target);
+            const requirements = Array.from(document.querySelectorAll('#requirements-list input'))
+                .map(input => input.value)
+                .filter(value => value.trim() !== '');
+            
+            const projectData = {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                requirements: requirements,
+                urgency: formData.get('urgency'),
+                budget: formData.get('budget') || null
+            };
+            
+            try {
+                const response = await fetch('http://localhost:8000/projects', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(projectData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Erro na requisição');
+                }
+                
+                const result = await response.json();
+                displayResult(result);
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao processar projeto. Tente novamente.');
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('project-form').style.display = 'block';
+            }
+        }
+
+        function simulateProgress() {
+            const progressInfo = document.getElementById('progress-info');
+            const phases = [
+                "⚡ Fase 1: Análise individual dos agentes",
+                "🤝 Fase 2: Colaboração entre especialistas", 
+                "🔄 Fase 3: Síntese de soluções integradas",
+                "💬 Fase 4: Comunicação clara da resposta",
+                "✅ Fase 5: Finalização e preparação"
+            ];
+            
+            let currentPhase = 0;
+            const interval = setInterval(() => {
+                if (currentPhase < phases.length) {
+                    progressInfo.innerHTML = `<p>${phases[currentPhase]}</p>`;
+                    currentPhase++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 800);
+        }
+
+        function displayResult(result) {
+            currentSessionId = result.session_id;
+            
+            // Esconder loading
+            document.getElementById('loading').classList.remove('active');
+            
+            // Atualizar estatísticas
+            document.getElementById('confidence').textContent = `Confiança: ${result.confidence}%`;
+            document.getElementById('collaborations').textContent = result.collaborations;
+            document.getElementById('agents-count').textContent = result.agents_involved.length;
+            
+            // Converter markdown para HTML básico
+            const htmlContent = result.response
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/^# (.*$)/gm, '<h2>$1</h2>')
+                .replace(/^## (.*$)/gm, '<h3>$1</h3>')
+                .replace(/^- (.*$)/gm, '<li>$1</li>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/^(.*)$/gm, '<p>$1</p>')
+                .replace(/<p><li>/g, '<ul><li>')
+                .replace(/<\/li><\/p>/g, '</li></ul>');
+            
+            document.getElementById('result-content').innerHTML = htmlContent;
+            
+            // Mostrar resultado
+            document.getElementById('result').classList.add('active');
+        }
+
+        async function submitFeedback() {
+            const feedback = document.getElementById('feedback').value;
+            if (!feedback.trim()) {
+                alert('Por favor, forneça um feedback.');
+                return;
+            }
+            
+            if (!currentSessionId) {
+                alert('Nenhuma sessão ativa.');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`http://localhost:8000/projects/${currentSessionId}/iterate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        session_id: currentSessionId,
+                        feedback: feedback
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Erro na iteração');
+                }
+                
+                const result = await response.json();
+                
+                // Atualizar conteúdo
+                const htmlContent = result.response
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/^# (.*$)/gm, '<h2>$1</h2>')
+                    .replace(/^## (.*$)/gm, '<h3>$1</h3>')
+                    .replace(/^- (.*$)/gm, '<li>$1</li>')
+                    .replace(/\n\n/g, '</p><p>')
+                    .replace(/^(.*)$/gm, '<p>$1</p>')
+                    .replace(/<p><li>/g, '<ul><li>')
+                    .replace(/<\/li><\/p>/g, '</li></ul>');
+                
+                document.getElementById('result-content').innerHTML = htmlContent;
+                document.getElementById('feedback').value = '';
+                
+                // Scroll para o resultado
+                document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao processar feedback. Tente novamente.');
+            }
+        }
+
+        function newProject() {
+            // Reset form
+            document.getElementById('project-form-element').reset();
+            document.getElementById('requirements-list').innerHTML = `
+                <div class="requirement-item">
+                    <input type="text" placeholder="Ex: Sistema de pedidos online" required>
+                    <button type="button" onclick="removeRequirement(this)">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            
+            // Mostrar formulário
+            document.getElementById('result').classList.remove('active');
+            document.getElementById('project-form').style.display = 'block';
+            
+            // Scroll para o topo
+            document.getElementById('project-form').scrollIntoView({ behavior: 'smooth' });
+            
+            currentSessionId = null;
+        }
+    </script>
+</body>
+</html>
