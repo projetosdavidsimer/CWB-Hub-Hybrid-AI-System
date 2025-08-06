@@ -1,0 +1,17 @@
+# CWB Hub Python SDK - Requirements
+# Melhoria #3 Fase 3 - SDK Python
+
+# HTTP Client
+httpx>=0.25.0
+
+# Data handling
+pydantic>=2.0.0
+
+# Async support
+asyncio-compat>=0.1.0
+
+# Optional: CLI support
+click>=8.0.0
+
+# Optional: Rich output
+rich>=13.0.0
