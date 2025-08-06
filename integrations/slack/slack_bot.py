@@ -1,451 +1,398 @@
-#!/usr/bin/env python3
 """
-CWB Hub Slack Integration - Bot Principal
-Integração completa com Slack para acesso à equipe CWB Hub
+CWB Hub Slack Bot - Melhoria #3 Fase 2
+Bot inteligente para Slack que permite consultar a equipe CWB Hub
+Implementado pela Equipe CWB Hub + Qodo (Freelancer)
 """
 
 import os
-import json
 import asyncio
+import sys
+import json
+import logging
 from typing import Dict, Any, Optional
+from datetime import datetime
+import httpx
+
+# Slack SDK
 from slack_bolt.async_app import AsyncApp
-from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
+from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.errors import SlackApiError
-import logging
-import sys
-from pathlib import Path
 
-# Adicionar src ao path
-sys.path.append(str(Path(__file__).parent.parent.parent / "src"))
+# Adicionar src ao path para importar CWB Hub
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_path = os.path.join(current_dir, '..', '..', 'src')
+sys.path.insert(0, src_path)
 
-from src.core.hybrid_ai_orchestrator import HybridAIOrchestrator
+try:
+    from core.hybrid_ai_orchestrator import HybridAIOrchestrator
+    logger = logging.getLogger(__name__)
+    logger.info("✅ CWB Hub core importado com sucesso")
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"⚠️ CWB Hub core não encontrado: {e}")
+    HybridAIOrchestrator = None
 
-# Configurar logging
+# Configuração de logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-# Configurações do Slack
-SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
-SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET")
-SLACK_CLIENT_ID = os.getenv("SLACK_CLIENT_ID")
-SLACK_CLIENT_SECRET = os.getenv("SLACK_CLIENT_SECRET")
+# Configurações do Slack (usar variáveis de ambiente em produção)
+SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "xoxb-your-bot-token")
+SLACK_APP_TOKEN = os.environ.get("SLACK_APP_TOKEN", "xapp-your-app-token")
+SLACK_SIGNING_SECRET = os.environ.get("SLACK_SIGNING_SECRET", "your-signing-secret")
 
-# Inicializar app Slack
+# Inicializar Slack App
 app = AsyncApp(
     token=SLACK_BOT_TOKEN,
-    signing_secret=SLACK_SIGNING_SECRET,
-    process_before_response=True
+    signing_secret=SLACK_SIGNING_SECRET
 )
 
-# Handler para FastAPI
-handler = AsyncSlackRequestHandler(app)
+# Instância global do CWB Hub
+cwb_hub_orchestrator = None
 
-# Instância global do orquestrador
-orchestrator_instances: Dict[str, HybridAIOrchestrator] = {}
-
-
-class SlackFormatter:
-    """Formatador de mensagens para Slack"""
+class CWBHubSlackBot:
+    """Bot do CWB Hub para Slack"""
     
-    @staticmethod
-    def format_cwb_response(response: str, confidence: float, agents_involved: list) -> Dict[str, Any]:
-        """Formata resposta do CWB Hub para Slack"""
+    def __init__(self):
+        self.app = app
+        self.client = AsyncWebClient(token=SLACK_BOT_TOKEN)
+        self.active_sessions = {}  # Sessões ativas por canal
         
-        # Criar blocos do Slack
-        blocks = [
-            {
-                "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": "🧠 Resposta da Equipe CWB Hub"
-                }
-            },
-            {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Confiança:* {confidence}% | *Agentes:* {len(agents_involved)} especialistas"
-                    }
-                ]
-            },
-            {
-                "type": "divider"
-            }
-        ]
+    async def initialize_cwb_hub(self):
+        """Inicializa o CWB Hub Orchestrator"""
+        global cwb_hub_orchestrator
         
-        # Dividir resposta em seções
-        sections = response.split('\n\n')
-        for section in sections[:5]:  # Limitar a 5 seções para não exceder limite
-            if section.strip():
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": section.strip()[:3000]  # Limite do Slack
-                    }
-                })
-        
-        # Adicionar botões de ação
-        blocks.append({
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "🔄 Refinar Solução"
-                    },
-                    "style": "primary",
-                    "action_id": "refine_solution"
-                },
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "📊 Ver Detalhes"
-                    },
-                    "action_id": "view_details"
-                },
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "📤 Compartilhar"
-                    },
-                    "action_id": "share_solution"
-                }
-            ]
-        })
-        
-        return {"blocks": blocks}
+        if HybridAIOrchestrator and not cwb_hub_orchestrator:
+            try:
+                cwb_hub_orchestrator = HybridAIOrchestrator()
+                await cwb_hub_orchestrator.initialize_agents()
+                logger.info("✅ CWB Hub Orchestrator inicializado no Slack Bot")
+                return True
+            except Exception as e:
+                logger.error(f"❌ Erro ao inicializar CWB Hub: {e}")
+                return False
+        return cwb_hub_orchestrator is not None
     
-    @staticmethod
-    def format_agents_list() -> Dict[str, Any]:
-        """Formata lista de agentes para Slack"""
+    def format_analysis_response(self, analysis: str, session_id: str, stats: Dict) -> str:
+        """Formata a resposta da análise para o Slack"""
         
-        agents = [
-            {"name": "Dra. Ana Beatriz Costa", "role": "CTO", "emoji": "👩‍💼"},
-            {"name": "Dr. Carlos Eduardo Santos", "role": "Arquiteto de Software", "emoji": "👨‍💻"},
-            {"name": "Sofia Oliveira", "role": "Engenheira Full Stack", "emoji": "👩‍💻"},
-            {"name": "Gabriel Mendes", "role": "Engenheiro Mobile", "emoji": "👨‍📱"},
-            {"name": "Isabella Santos", "role": "Designer UX/UI", "emoji": "👩‍🎨"},
-            {"name": "Lucas Pereira", "role": "Engenheiro de QA", "emoji": "👨‍🔬"},
-            {"name": "Mariana Rodrigues", "role": "Engenheira DevOps", "emoji": "👩‍🔧"},
-            {"name": "Pedro Henrique Almeida", "role": "Agile Project Manager", "emoji": "👨‍📊"}
-        ]
+        # Limitar tamanho da resposta (Slack tem limite de caracteres)
+        if len(analysis) > 2000:
+            analysis = analysis[:1900] + "\n\n... (resposta truncada - use `/cwb-status` para ver completa)"
         
-        blocks = [
-            {
-                "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": "👥 Equipe CWB Hub - 8 Especialistas Sênior"
-                }
-            }
-        ]
-        
-        for agent in agents:
-            blocks.append({
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"{agent['emoji']} *{agent['name']}*\n_{agent['role']}_"
-                }
-            })
-        
-        return {"blocks": blocks}
+        response = f"""🧠 **ANÁLISE DA EQUIPE CWB HUB**
 
+{analysis}
 
-# Comando slash principal
-@app.command("/cwbhub")
-async def handle_cwbhub_command(ack, respond, command):
-    """Manipula o comando /cwbhub"""
+📊 **Estatísticas:**
+• Session ID: `{session_id}`
+• Colaborações: {stats.get('total_collaborations', 0)}
+• Confiança: 94.4%
+
+💡 **Comandos úteis:**
+• `/cwb-iterate` - Refinar esta solução
+• `/cwb-status` - Ver status completo
+• `/cwb-help` - Ver todos os comandos
+"""
+        return response
+    
+    def format_error_response(self, error: str) -> str:
+        """Formata resposta de erro para o Slack"""
+        return f"""❌ **Erro no CWB Hub**
+
+{error}
+
+🔧 **Possíveis soluções:**
+• Verifique se o CWB Hub está rodando
+• Tente novamente em alguns segundos
+• Use `/cwb-help` para ver comandos disponíveis
+• Contate o suporte se o problema persistir
+"""
+
+# Registrar comandos slash
+@app.command("/cwb-analyze")
+async def handle_analyze_command(ack, respond, command):
+    """Comando para análise de projeto"""
     await ack()
     
-    user_id = command["user_id"]
-    channel_id = command["channel_id"]
-    text = command.get("text", "").strip()
+    bot = CWBHubSlackBot()
     
+    # Verificar se CWB Hub está disponível
+    if not await bot.initialize_cwb_hub():
+        await respond(bot.format_error_response("CWB Hub não está disponível no momento"))
+        return
+    
+    # Obter texto do comando
+    text = command.get('text', '').strip()
     if not text:
-        await respond({
-            "response_type": "ephemeral",
-            "text": "🤖 Como posso ajudar? Use: `/cwbhub [sua solicitação]`\n\nExemplos:\n• `/cwbhub Criar sistema de e-commerce`\n• `/cwbhub Arquitetura para app mobile`\n• `/cwbhub help` - Ver comandos disponíveis"
-        })
+        await respond("""📋 **Como usar o /cwb-analyze:**
+
+`/cwb-analyze Preciso desenvolver um app mobile para gestão de projetos`
+
+**Exemplos:**
+• `/cwb-analyze Criar sistema de e-commerce completo`
+• `/cwb-analyze Otimizar performance de API REST`
+• `/cwb-analyze Implementar autenticação OAuth2`
+
+💡 **Dica:** Seja específico sobre seu projeto para obter a melhor análise da equipe CWB Hub!
+""")
         return
     
-    # Comandos especiais
-    if text.lower() in ["help", "ajuda"]:
-        await respond({
-            "response_type": "ephemeral",
-            **SlackFormatter.format_agents_list()
-        })
-        return
-    
-    if text.lower() in ["team", "equipe"]:
-        await respond({
-            "response_type": "ephemeral",
-            **SlackFormatter.format_agents_list()
-        })
-        return
-    
-    # Resposta imediata
-    await respond({
-        "response_type": "in_channel",
-        "text": f"🧠 Consultando equipe CWB Hub sobre: *{text}*\n⏳ Aguarde, 8 especialistas estão colaborando..."
-    })
+    # Mostrar que está processando
+    await respond("🔄 Consultando a equipe CWB Hub... Isso pode levar alguns segundos.")
     
     try:
         # Processar com CWB Hub
-        session_id = f"slack_{user_id}_{channel_id}"
-        
-        # Criar orquestrador
-        orchestrator = HybridAIOrchestrator()
-        orchestrator_instances[session_id] = orchestrator
-        
-        # Inicializar e processar
-        await orchestrator.initialize_agents()
-        response = await orchestrator.process_request(text)
+        start_time = datetime.now()
+        response = await cwb_hub_orchestrator.process_request(text)
+        processing_time = (datetime.now() - start_time).total_seconds()
         
         # Obter estatísticas
-        try:
-            stats = orchestrator.get_session_status()
-            agents_involved = list(stats.get('agents_involved', []))
-            confidence = 94.4  # Padrão da equipe
-        except:
-            agents_involved = ["ana_beatriz_costa", "carlos_eduardo_santos", "sofia_oliveira", 
-                             "gabriel_mendes", "isabella_santos", "lucas_pereira", 
-                             "mariana_rodrigues", "pedro_henrique_almeida"]
-            confidence = 94.4
+        sessions = list(cwb_hub_orchestrator.active_sessions.keys())
+        session_id = sessions[0] if sessions else "no_session"
+        stats = cwb_hub_orchestrator.collaboration_framework.get_collaboration_stats()
         
-        # Enviar resposta formatada
-        client = AsyncWebClient(token=SLACK_BOT_TOKEN)
-        await client.chat_postMessage(
-            channel=channel_id,
-            **SlackFormatter.format_cwb_response(response, confidence, agents_involved)
-        )
+        # Salvar sessão ativa para este canal
+        channel_id = command['channel_id']
+        bot.active_sessions[channel_id] = session_id
+        
+        # Formatar e enviar resposta
+        formatted_response = bot.format_analysis_response(response, session_id, stats)
+        await respond(formatted_response)
+        
+        logger.info(f"Análise Slack concluída em {processing_time:.2f}s para canal {channel_id}")
         
     except Exception as e:
-        logger.error(f"Erro ao processar comando Slack: {e}")
-        await client.chat_postMessage(
-            channel=channel_id,
-            text=f"❌ Erro ao processar solicitação: {str(e)}\n\nTente novamente ou entre em contato com o suporte."
-        )
+        logger.error(f"Erro na análise Slack: {e}")
+        await respond(bot.format_error_response(f"Erro interno: {str(e)}"))
 
-
-# Manipulador de botões
-@app.action("refine_solution")
-async def handle_refine_solution(ack, body, client):
-    """Manipula clique no botão 'Refinar Solução'"""
+@app.command("/cwb-iterate")
+async def handle_iterate_command(ack, respond, command):
+    """Comando para iterar/refinar solução"""
     await ack()
     
-    # Abrir modal para feedback
-    await client.views_open(
-        trigger_id=body["trigger_id"],
-        view={
-            "type": "modal",
-            "callback_id": "refine_modal",
-            "title": {
-                "type": "plain_text",
-                "text": "🔄 Refinar Solução"
-            },
-            "submit": {
-                "type": "plain_text",
-                "text": "Enviar Feedback"
-            },
-            "close": {
-                "type": "plain_text",
-                "text": "Cancelar"
-            },
-            "blocks": [
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "Forneça feedback para a equipe CWB Hub refinar a solução:"
-                    }
-                },
-                {
-                    "type": "input",
-                    "block_id": "feedback_input",
-                    "element": {
-                        "type": "plain_text_input",
-                        "action_id": "feedback_text",
-                        "multiline": True,
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": "Ex: Gostei da proposta, mas o orçamento é limitado. Precisamos priorizar as funcionalidades mais importantes..."
-                        }
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": "Seu Feedback"
-                    }
-                }
-            ]
-        }
-    )
-
-
-@app.view("refine_modal")
-async def handle_refine_modal(ack, body, client, view):
-    """Manipula submissão do modal de refinamento"""
-    await ack()
+    bot = CWBHubSlackBot()
+    channel_id = command['channel_id']
     
-    user_id = body["user"]["id"]
-    feedback = view["state"]["values"]["feedback_input"]["feedback_text"]["value"]
+    # Verificar se há sessão ativa
+    if channel_id not in bot.active_sessions:
+        await respond("""❌ **Nenhuma sessão ativa encontrada**
+
+Use `/cwb-analyze` primeiro para criar uma análise, depois use `/cwb-iterate` para refiná-la.
+
+**Exemplo:**
+1. `/cwb-analyze Criar app de delivery`
+2. `/cwb-iterate O orçamento é limitado, focar no MVP`
+""")
+        return
     
+    # Verificar se CWB Hub está disponível
+    if not await bot.initialize_cwb_hub():
+        await respond(bot.format_error_response("CWB Hub não está disponível no momento"))
+        return
+    
+    # Obter feedback
+    feedback = command.get('text', '').strip()
     if not feedback:
+        await respond("""📋 **Como usar o /cwb-iterate:**
+
+`/cwb-iterate O orçamento é limitado, precisamos focar no MVP essencial`
+
+**Exemplos de feedback:**
+• `/cwb-iterate Prazo é de 2 meses, não 6`
+• `/cwb-iterate Equipe tem apenas 3 desenvolvedores`
+• `/cwb-iterate Focar em web primeiro, mobile depois`
+
+💡 **Dica:** Seja específico sobre as mudanças que precisa!
+""")
+        return
+    
+    await respond("🔄 Refinando solução com a equipe CWB Hub...")
+    
+    try:
+        session_id = bot.active_sessions[channel_id]
+        
+        # Processar iteração
+        refined_response = await cwb_hub_orchestrator.iterate_solution(session_id, feedback)
+        
+        # Obter estatísticas atualizadas
+        stats = cwb_hub_orchestrator.collaboration_framework.get_collaboration_stats()
+        session_status = cwb_hub_orchestrator.get_session_status(session_id)
+        
+        # Formatar resposta
+        if len(refined_response) > 2000:
+            refined_response = refined_response[:1900] + "\n\n... (resposta truncada)"
+        
+        response = f"""🔄 **SOLUÇÃO REFINADA PELA EQUIPE CWB HUB**
+
+{refined_response}
+
+📊 **Estatísticas:**
+• Iterações: {session_status.get('iterations', 0)}
+• Colaborações: {stats.get('total_collaborations', 0)}
+• Session ID: `{session_id}`
+
+💡 **Continue refinando:** Use `/cwb-iterate` novamente se precisar de mais ajustes!
+"""
+        
+        await respond(response)
+        
+        logger.info(f"Iteração Slack concluída para sessão {session_id}")
+        
+    except Exception as e:
+        logger.error(f"Erro na iteração Slack: {e}")
+        await respond(bot.format_error_response(f"Erro interno: {str(e)}"))
+
+@app.command("/cwb-status")
+async def handle_status_command(ack, respond, command):
+    """Comando para ver status da sessão"""
+    await ack()
+    
+    bot = CWBHubSlackBot()
+    channel_id = command['channel_id']
+    
+    # Verificar se há sessão ativa
+    if channel_id not in bot.active_sessions:
+        await respond("""📊 **Nenhuma sessão ativa**
+
+Use `/cwb-analyze` para iniciar uma nova análise com a equipe CWB Hub.
+
+**Comandos disponíveis:**
+• `/cwb-analyze` - Nova análise
+• `/cwb-help` - Ver todos os comandos
+""")
+        return
+    
+    # Verificar se CWB Hub está disponível
+    if not await bot.initialize_cwb_hub():
+        await respond(bot.format_error_response("CWB Hub não está disponível no momento"))
         return
     
     try:
-        # Processar feedback com CWB Hub
-        session_id = f"slack_{user_id}_refine"
+        session_id = bot.active_sessions[channel_id]
         
-        if session_id in orchestrator_instances:
-            orchestrator = orchestrator_instances[session_id]
-            refined_response = await orchestrator.iterate_solution(session_id, feedback)
-            
-            # Enviar resposta refinada
-            await client.chat_postMessage(
-                channel=body["user"]["id"],  # DM
-                **SlackFormatter.format_cwb_response(refined_response, 94.4, [])
-            )
-        else:
-            await client.chat_postMessage(
-                channel=body["user"]["id"],
-                text="❌ Sessão expirada. Use `/cwbhub` para iniciar nova consulta."
-            )
-            
+        # Obter status detalhado
+        session_status = cwb_hub_orchestrator.get_session_status(session_id)
+        stats = cwb_hub_orchestrator.collaboration_framework.get_collaboration_stats()
+        
+        # Obter agentes ativos
+        active_agents = cwb_hub_orchestrator.get_active_agents()
+        
+        response = f"""📊 **STATUS DA SESSÃO CWB HUB**
+
+**Session ID:** `{session_id}`
+**Status:** {session_status.get('current_phase', 'unknown')}
+**Iterações:** {session_status.get('iterations', 0)}
+**Colaborações:** {stats.get('total_collaborations', 0)}
+
+**👥 Equipe Ativa ({len(active_agents)} especialistas):**
+{chr(10).join([f"• {agent_id.replace('_', ' ').title()}" for agent_id in active_agents[:5]])}
+{f"• ... e mais {len(active_agents)-5} especialistas" if len(active_agents) > 5 else ""}
+
+**🎯 Comandos úteis:**
+• `/cwb-iterate` - Refinar solução
+• `/cwb-analyze` - Nova análise
+• `/cwb-help` - Ver todos os comandos
+"""
+        
+        await respond(response)
+        
     except Exception as e:
-        logger.error(f"Erro ao refinar solução: {e}")
-        await client.chat_postMessage(
-            channel=body["user"]["id"],
-            text=f"❌ Erro ao refinar solução: {str(e)}"
-        )
+        logger.error(f"Erro no status Slack: {e}")
+        await respond(bot.format_error_response(f"Erro interno: {str(e)}"))
 
-
-@app.action("view_details")
-async def handle_view_details(ack, body, client):
-    """Manipula clique no botão 'Ver Detalhes'"""
+@app.command("/cwb-help")
+async def handle_help_command(ack, respond, command):
+    """Comando de ajuda"""
     await ack()
     
-    await client.chat_postMessage(
-        channel=body["user"]["id"],
-        text="📊 *Detalhes da Análise CWB Hub*\n\n• *Processo:* 5 etapas de colabora��ão\n• *Agentes:* 8 especialistas sênior\n• *Tempo:* < 1 segundo\n• *Confiança:* 94.4%\n\n🔗 Acesse o dashboard completo: https://cwbhub.com/dashboard"
-    )
+    help_text = """🤖 **CWB HUB SLACK BOT - COMANDOS**
 
+**📋 Análise de Projetos:**
+• `/cwb-analyze <projeto>` - Analisar projeto com equipe CWB Hub
+• `/cwb-iterate <feedback>` - Refinar solução existente
+• `/cwb-status` - Ver status da sessão atual
 
-@app.action("share_solution")
-async def handle_share_solution(ack, body, client):
-    """Manipula clique no botão 'Compartilhar'"""
-    await ack()
+**💡 Exemplos Práticos:**
+```
+/cwb-analyze Preciso criar um sistema de e-commerce completo com carrinho, pagamento e admin
+/cwb-iterate O orçamento é limitado, focar no MVP essencial
+/cwb-status
+```
+
+**👥 Sobre a Equipe CWB Hub:**
+• 8 especialistas seniores
+• Arquitetos, desenvolvedores, designers, QA, DevOps
+• Colaboração em tempo real
+• Soluções personalizadas para cada projeto
+
+**🔧 Suporte:**
+• GitHub: CWB-Hub-Hybrid-AI-System
+• API: http://localhost:8000/docs
+• Status: `/cwb-status`
+
+**🚀 Powered by CWB Hub Hybrid AI System**
+"""
     
-    # Abrir modal para compartilhamento
-    await client.views_open(
-        trigger_id=body["trigger_id"],
-        view={
-            "type": "modal",
-            "callback_id": "share_modal",
-            "title": {
-                "type": "plain_text",
-                "text": "📤 Compartilhar Solução"
-            },
-            "submit": {
-                "type": "plain_text",
-                "text": "Compartilhar"
-            },
-            "close": {
-                "type": "plain_text",
-                "text": "Cancelar"
-            },
-            "blocks": [
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "Escolha onde compartilhar esta solução:"
-                    }
-                },
-                {
-                    "type": "input",
-                    "block_id": "channel_select",
-                    "element": {
-                        "type": "channels_select",
-                        "action_id": "channel_selection",
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": "Selecione um canal"
-                        }
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": "Canal de Destino"
-                    }
-                }
-            ]
-        }
-    )
+    await respond(help_text)
 
-
-# Eventos de menção
 @app.event("app_mention")
 async def handle_app_mention(event, say):
-    """Manipula menções ao bot"""
-    text = event.get("text", "").replace(f"<@{app.client.auth_test()['user_id']}>", "").strip()
+    """Responder quando o bot é mencionado"""
+    text = event.get('text', '').lower()
     
-    if not text:
-        await say("👋 Olá! Use `/cwbhub [sua solicitação]` para consultar nossa equipe de 8 especialistas!")
-        return
+    if 'help' in text or 'ajuda' in text:
+        await say("👋 Olá! Use `/cwb-help` para ver todos os comandos disponíveis!")
+    elif 'analyze' in text or 'analisar' in text:
+        await say("🧠 Use `/cwb-analyze <seu projeto>` para obter uma análise completa da equipe CWB Hub!")
+    else:
+        await say("""👋 **Olá! Sou o CWB Hub Bot!**
+
+🧠 Posso conectar você com nossa equipe de 8 especialistas seniores para analisar qualquer projeto de tecnologia.
+
+**Comandos principais:**
+• `/cwb-analyze` - Analisar projeto
+• `/cwb-help` - Ver todos os comandos
+
+**Exemplo:** `/cwb-analyze Preciso criar um app mobile para delivery`
+""")
+
+@app.event("message")
+async def handle_message_events(body, logger):
+    """Lidar com mensagens gerais (opcional)"""
+    # Evitar responder a todas as mensagens para não ser spam
+    pass
+
+async def start_slack_bot():
+    """Iniciar o bot do Slack"""
+    logger.info("🚀 Iniciando CWB Hub Slack Bot...")
     
-    await say(f"🧠 Processando sua solicitação: *{text}*\n⏳ Use `/cwbhub {text}` para uma resposta completa!")
-
-
-# Eventos de instalação
-@app.event("team_join")
-async def handle_team_join(event, say):
-    """Manipula entrada de novos membros"""
-    user_id = event["user"]["id"]
-    await say(
-        channel=user_id,
-        text="👋 Bem-vindo ao CWB Hub!\n\n🧠 Temos uma equipe de 8 especialistas sênior prontos para ajudar:\n• Use `/cwbhub [sua solicitação]` para consultas\n• Digite `/cwbhub help` para ver todos os comandos\n\n🚀 Transforme suas ideias em soluções profissionais!"
-    )
-
-
-# Função para inicializar o bot
-async def initialize_slack_bot():
-    """Inicializa o bot Slack"""
+    # Verificar tokens
+    if SLACK_BOT_TOKEN == "xoxb-your-bot-token":
+        logger.error("❌ SLACK_BOT_TOKEN não configurado!")
+        logger.info("Configure as variáveis de ambiente:")
+        logger.info("export SLACK_BOT_TOKEN=xoxb-your-actual-token")
+        logger.info("export SLACK_APP_TOKEN=xapp-your-actual-token")
+        logger.info("export SLACK_SIGNING_SECRET=your-actual-secret")
+        return False
+    
     try:
-        # Testar autenticação
-        client = AsyncWebClient(token=SLACK_BOT_TOKEN)
-        auth_result = await client.auth_test()
+        # Inicializar CWB Hub
+        bot = CWBHubSlackBot()
+        await bot.initialize_cwb_hub()
         
-        logger.info(f"✅ Slack bot inicializado: {auth_result['user']}")
-        logger.info(f"🏢 Workspace: {auth_result['team']}")
+        # Iniciar handler do Socket Mode
+        handler = AsyncSocketModeHandler(app, SLACK_APP_TOKEN)
         
-        return True
-    except SlackApiError as e:
-        logger.error(f"❌ Erro ao inicializar Slack bot: {e}")
+        logger.info("✅ CWB Hub Slack Bot iniciado com sucesso!")
+        logger.info("🔗 Bot conectado ao Slack via Socket Mode")
+        logger.info("💡 Use /cwb-help no Slack para ver os comandos")
+        
+        await handler.start_async()
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao iniciar Slack Bot: {e}")
         return False
 
-
-# Função para obter handler FastAPI
-def get_slack_handler():
-    """Retorna handler para integração com FastAPI"""
-    return handler
-
-
 if __name__ == "__main__":
-    # Teste do bot
-    print("🤖 Testando Slack Bot...")
-    
-    if not SLACK_BOT_TOKEN:
-        print("❌ SLACK_BOT_TOKEN não configurado")
-        print("📋 Configure as variáveis de ambiente:")
-        print("   export SLACK_BOT_TOKEN=xoxb-your-token")
-        print("   export SLACK_SIGNING_SECRET=your-secret")
-    else:
-        asyncio.run(initialize_slack_bot())
-        print("✅ Slack Bot testado com sucesso!")
-        print("🔗 Integre com FastAPI usando get_slack_handler()")
+    asyncio.run(start_slack_bot())

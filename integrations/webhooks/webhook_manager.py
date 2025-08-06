@@ -1,56 +1,54 @@
-#!/usr/bin/env python3
 """
-CWB Hub Webhook Manager - Sistema de Webhooks
-Gerenciamento completo de webhooks para integrações externas
+CWB Hub Webhook Manager - Melhoria #3 Fase 2
+Sistema de webhooks configuráveis para eventos do CWB Hub
+Implementado pela Equipe CWB Hub + Qodo (Freelancer)
 """
 
-import os
-import json
 import asyncio
-import hmac
-import hashlib
+import json
+import logging
 import time
-from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, asdict
 from enum import Enum
-import aiohttp
-import logging
-from pathlib import Path
-import sys
+import httpx
+import hashlib
+import hmac
+from urllib.parse import urlparse
 
-# Adicionar persistence ao path
-sys.path.append(str(Path(__file__).parent.parent.parent / "persistence"))
-
-from database.connection import get_async_db_session
-from database.models import User, Project, Session, AuditLog
-
-# Configurar logging
+# Configuração de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class WebhookEvent(Enum):
     """Tipos de eventos de webhook"""
-    PROJECT_CREATED = "project.created"
-    PROJECT_COMPLETED = "project.completed"
-    PROJECT_UPDATED = "project.updated"
-    SESSION_STARTED = "session.started"
-    SESSION_COMPLETED = "session.completed"
-    FEEDBACK_RECEIVED = "feedback.received"
-    ERROR_OCCURRED = "error.occurred"
-    USER_REGISTERED = "user.registered"
-    INTEGRATION_CONNECTED = "integration.connected"
+    ANALYSIS_STARTED = "analysis.started"
+    ANALYSIS_COMPLETED = "analysis.completed"
+    ANALYSIS_FAILED = "analysis.failed"
+    ITERATION_STARTED = "iteration.started"
+    ITERATION_COMPLETED = "iteration.completed"
+    SESSION_CREATED = "session.created"
+    SESSION_UPDATED = "session.updated"
+    AGENT_COLLABORATION = "agent.collaboration"
+    SYSTEM_HEALTH = "system.health"
 
-
-class WebhookStatus(Enum):
-    """Status de entrega do webhook"""
-    PENDING = "pending"
-    DELIVERED = "delivered"
-    FAILED = "failed"
-    RETRYING = "retrying"
-    EXPIRED = "expired"
-
+@dataclass
+class WebhookConfig:
+    """Configuração de webhook"""
+    id: str
+    url: str
+    events: List[str]
+    secret: Optional[str] = None
+    active: bool = True
+    retry_count: int = 3
+    timeout: int = 30
+    created_at: datetime = None
+    last_triggered: Optional[datetime] = None
+    
+    def __post_init__(self):
+        if self.created_at is None:
+            self.created_at = datetime.utcnow()
 
 @dataclass
 class WebhookPayload:
@@ -58,416 +56,386 @@ class WebhookPayload:
     event: str
     timestamp: datetime
     data: Dict[str, Any]
-    user_id: Optional[int] = None
-    project_id: Optional[int] = None
-    session_id: Optional[str] = None
-
-
-@dataclass
-class WebhookEndpoint:
-    """Configuração de endpoint de webhook"""
-    id: str
-    url: str
-    secret: str
-    events: List[str]
-    active: bool = True
-    retry_count: int = 3
-    timeout: int = 30
-    created_at: datetime = None
-    last_delivery: Optional[datetime] = None
-
+    webhook_id: str
+    signature: Optional[str] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Converter para dicionário"""
+        return {
+            "event": self.event,
+            "timestamp": self.timestamp.isoformat(),
+            "data": self.data,
+            "webhook_id": self.webhook_id,
+            "signature": self.signature
+        }
 
 @dataclass
 class WebhookDelivery:
     """Registro de entrega de webhook"""
     id: str
-    endpoint_id: str
+    webhook_id: str
     event: str
-    payload: Dict[str, Any]
-    status: WebhookStatus
-    response_code: Optional[int] = None
+    url: str
+    status_code: Optional[int] = None
     response_body: Optional[str] = None
-    attempts: int = 0
-    created_at: datetime = None
+    error: Optional[str] = None
+    attempt: int = 1
     delivered_at: Optional[datetime] = None
-    next_retry: Optional[datetime] = None
-
+    created_at: datetime = None
+    
+    def __post_init__(self):
+        if self.created_at is None:
+            self.created_at = datetime.utcnow()
 
 class WebhookManager:
-    """Gerenciador de webhooks"""
+    """Gerenciador de webhooks do CWB Hub"""
     
     def __init__(self):
-        self.endpoints: Dict[str, WebhookEndpoint] = {}
-        self.deliveries: Dict[str, WebhookDelivery] = {}
-        self.max_retries = 5
-        self.retry_delays = [60, 300, 900, 3600, 7200]  # 1min, 5min, 15min, 1h, 2h
-    
-    def register_endpoint(self, endpoint: WebhookEndpoint) -> bool:
-        """Registra um novo endpoint de webhook"""
-        try:
-            if not endpoint.created_at:
-                endpoint.created_at = datetime.utcnow()
-            
-            self.endpoints[endpoint.id] = endpoint
-            logger.info(f"✅ Endpoint registrado: {endpoint.id} -> {endpoint.url}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Erro ao registrar endpoint: {e}")
-            return False
-    
-    def unregister_endpoint(self, endpoint_id: str) -> bool:
-        """Remove um endpoint de webhook"""
-        try:
-            if endpoint_id in self.endpoints:
-                del self.endpoints[endpoint_id]
-                logger.info(f"✅ Endpoint removido: {endpoint_id}")
-                return True
-            return False
-            
-        except Exception as e:
-            logger.error(f"❌ Erro ao remover endpoint: {e}")
-            return False
-    
-    def update_endpoint(self, endpoint_id: str, updates: Dict[str, Any]) -> bool:
-        """Atualiza configurações de um endpoint"""
-        try:
-            if endpoint_id not in self.endpoints:
-                return False
-            
-            endpoint = self.endpoints[endpoint_id]
-            for key, value in updates.items():
-                if hasattr(endpoint, key):
-                    setattr(endpoint, key, value)
-            
-            logger.info(f"✅ Endpoint atualizado: {endpoint_id}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Erro ao atualizar endpoint: {e}")
-            return False
-    
-    async def send_webhook(self, event: WebhookEvent, data: Dict[str, Any], 
-                          user_id: Optional[int] = None, project_id: Optional[int] = None,
-                          session_id: Optional[str] = None) -> List[str]:
-        """Envia webhook para todos os endpoints interessados"""
+        self.webhooks: Dict[str, WebhookConfig] = {}
+        self.deliveries: List[WebhookDelivery] = []
+        self.event_handlers: Dict[str, List[Callable]] = {}
+        self.client = httpx.AsyncClient(timeout=30.0)
         
-        # Criar payload
+    def register_webhook(self, url: str, events: List[str], secret: Optional[str] = None) -> str:
+        """Registrar um novo webhook"""
+        webhook_id = self._generate_webhook_id(url)
+        
+        # Validar URL
+        if not self._validate_url(url):
+            raise ValueError(f"URL inválida: {url}")
+        
+        # Validar eventos
+        valid_events = [e.value for e in WebhookEvent]
+        for event in events:
+            if event not in valid_events:
+                raise ValueError(f"Evento inválido: {event}. Eventos válidos: {valid_events}")
+        
+        webhook = WebhookConfig(
+            id=webhook_id,
+            url=url,
+            events=events,
+            secret=secret
+        )
+        
+        self.webhooks[webhook_id] = webhook
+        
+        logger.info(f"Webhook registrado: {webhook_id} para {url}")
+        return webhook_id
+    
+    def unregister_webhook(self, webhook_id: str) -> bool:
+        """Remover um webhook"""
+        if webhook_id in self.webhooks:
+            del self.webhooks[webhook_id]
+            logger.info(f"Webhook removido: {webhook_id}")
+            return True
+        return False
+    
+    def update_webhook(self, webhook_id: str, **kwargs) -> bool:
+        """Atualizar configuração de webhook"""
+        if webhook_id not in self.webhooks:
+            return False
+        
+        webhook = self.webhooks[webhook_id]
+        
+        for key, value in kwargs.items():
+            if hasattr(webhook, key):
+                setattr(webhook, key, value)
+        
+        logger.info(f"Webhook atualizado: {webhook_id}")
+        return True
+    
+    def get_webhook(self, webhook_id: str) -> Optional[WebhookConfig]:
+        """Obter configuração de webhook"""
+        return self.webhooks.get(webhook_id)
+    
+    def list_webhooks(self) -> List[WebhookConfig]:
+        """Listar todos os webhooks"""
+        return list(self.webhooks.values())
+    
+    async def trigger_event(self, event: str, data: Dict[str, Any]) -> List[WebhookDelivery]:
+        """Disparar evento para webhooks relevantes"""
+        deliveries = []
+        
+        # Encontrar webhooks que escutam este evento
+        relevant_webhooks = [
+            webhook for webhook in self.webhooks.values()
+            if webhook.active and event in webhook.events
+        ]
+        
+        if not relevant_webhooks:
+            logger.debug(f"Nenhum webhook registrado para evento: {event}")
+            return deliveries
+        
+        logger.info(f"Disparando evento {event} para {len(relevant_webhooks)} webhooks")
+        
+        # Disparar para cada webhook
+        tasks = []
+        for webhook in relevant_webhooks:
+            task = self._deliver_webhook(webhook, event, data)
+            tasks.append(task)
+        
+        # Executar em paralelo
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for result in results:
+            if isinstance(result, WebhookDelivery):
+                deliveries.append(result)
+                self.deliveries.append(result)
+            elif isinstance(result, Exception):
+                logger.error(f"Erro ao entregar webhook: {result}")
+        
+        return deliveries
+    
+    async def _deliver_webhook(self, webhook: WebhookConfig, event: str, data: Dict[str, Any]) -> WebhookDelivery:
+        """Entregar webhook com retry"""
+        delivery_id = self._generate_delivery_id()
+        
         payload = WebhookPayload(
-            event=event.value,
+            event=event,
             timestamp=datetime.utcnow(),
             data=data,
-            user_id=user_id,
-            project_id=project_id,
-            session_id=session_id
+            webhook_id=webhook.id
         )
         
-        delivery_ids = []
+        # Gerar assinatura se secret estiver configurado
+        if webhook.secret:
+            payload.signature = self._generate_signature(payload.to_dict(), webhook.secret)
         
-        # Enviar para endpoints interessados
-        for endpoint_id, endpoint in self.endpoints.items():
-            if endpoint.active and event.value in endpoint.events:
-                delivery_id = await self._deliver_webhook(endpoint, payload)
-                if delivery_id:
-                    delivery_ids.append(delivery_id)
-        
-        return delivery_ids
-    
-    async def _deliver_webhook(self, endpoint: WebhookEndpoint, payload: WebhookPayload) -> Optional[str]:
-        """Entrega webhook para um endpoint específico"""
-        
-        # Criar registro de entrega
-        delivery_id = f"delivery_{int(time.time())}_{endpoint.id}"
         delivery = WebhookDelivery(
             id=delivery_id,
-            endpoint_id=endpoint.id,
-            event=payload.event,
-            payload=asdict(payload),
-            status=WebhookStatus.PENDING,
-            created_at=datetime.utcnow()
+            webhook_id=webhook.id,
+            event=event,
+            url=webhook.url
         )
         
-        self.deliveries[delivery_id] = delivery
-        
-        # Tentar entrega
-        success = await self._attempt_delivery(endpoint, delivery, payload)
-        
-        if success:
-            delivery.status = WebhookStatus.DELIVERED
-            delivery.delivered_at = datetime.utcnow()
-            endpoint.last_delivery = datetime.utcnow()
-        else:
-            delivery.status = WebhookStatus.FAILED
-            # Agendar retry se necessário
-            if delivery.attempts < self.max_retries:
-                delivery.status = WebhookStatus.RETRYING
-                delay = self.retry_delays[min(delivery.attempts, len(self.retry_delays) - 1)]
-                delivery.next_retry = datetime.utcnow() + timedelta(seconds=delay)
-        
-        return delivery_id
-    
-    async def _attempt_delivery(self, endpoint: WebhookEndpoint, delivery: WebhookDelivery, 
-                               payload: WebhookPayload) -> bool:
-        """Tenta entregar webhook"""
-        
-        try:
-            delivery.attempts += 1
+        # Tentar entregar com retry
+        for attempt in range(1, webhook.retry_count + 1):
+            delivery.attempt = attempt
             
-            # Preparar dados
-            payload_json = json.dumps(asdict(payload), default=str)
-            
-            # Criar assinatura HMAC
-            signature = self._create_signature(payload_json, endpoint.secret)
-            
-            # Headers
-            headers = {
-                'Content-Type': 'application/json',
-                'X-CWBHub-Signature': signature,
-                'X-CWBHub-Event': payload.event,
-                'X-CWBHub-Delivery': delivery.id,
-                'User-Agent': 'CWBHub-Webhooks/1.0'
-            }
-            
-            # Fazer requisição
-            timeout = aiohttp.ClientTimeout(total=endpoint.timeout)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(endpoint.url, data=payload_json, headers=headers) as response:
-                    delivery.response_code = response.status
-                    delivery.response_body = await response.text()
+            try:
+                headers = {
+                    "Content-Type": "application/json",
+                    "User-Agent": "CWB-Hub-Webhook/1.0",
+                    "X-CWB-Event": event,
+                    "X-CWB-Delivery": delivery_id,
+                    "X-CWB-Timestamp": str(int(payload.timestamp.timestamp()))
+                }
+                
+                if payload.signature:
+                    headers["X-CWB-Signature"] = payload.signature
+                
+                response = await self.client.post(
+                    webhook.url,
+                    json=payload.to_dict(),
+                    headers=headers,
+                    timeout=webhook.timeout
+                )
+                
+                delivery.status_code = response.status_code
+                delivery.response_body = response.text[:1000]  # Limitar tamanho
+                delivery.delivered_at = datetime.utcnow()
+                
+                # Atualizar último trigger do webhook
+                webhook.last_triggered = datetime.utcnow()
+                
+                if response.status_code < 400:
+                    logger.info(f"Webhook entregue com sucesso: {webhook.id} (tentativa {attempt})")
+                    break
+                else:
+                    logger.warning(f"Webhook falhou: {webhook.id} - Status {response.status_code} (tentativa {attempt})")
                     
-                    # Considerar sucesso se status 2xx
-                    if 200 <= response.status < 300:
-                        logger.info(f"✅ Webhook entregue: {delivery.id} -> {endpoint.url} ({response.status})")
-                        return True
-                    else:
-                        logger.warning(f"⚠️ Webhook falhou: {delivery.id} -> {endpoint.url} ({response.status})")
-                        return False
+            except Exception as e:
+                delivery.error = str(e)
+                logger.error(f"Erro ao entregar webhook {webhook.id} (tentativa {attempt}): {e}")
+                
+                # Se não é a última tentativa, aguardar antes de tentar novamente
+                if attempt < webhook.retry_count:
+                    await asyncio.sleep(2 ** attempt)  # Backoff exponencial
         
-        except asyncio.TimeoutError:
-            logger.error(f"⏰ Timeout webhook: {delivery.id} -> {endpoint.url}")
-            delivery.response_body = "Request timeout"
-            return False
+        return delivery
+    
+    def get_deliveries(self, webhook_id: Optional[str] = None, limit: int = 100) -> List[WebhookDelivery]:
+        """Obter histórico de entregas"""
+        deliveries = self.deliveries
         
-        except Exception as e:
-            logger.error(f"❌ Erro webhook: {delivery.id} -> {endpoint.url}: {e}")
-            delivery.response_body = str(e)
+        if webhook_id:
+            deliveries = [d for d in deliveries if d.webhook_id == webhook_id]
+        
+        # Ordenar por data (mais recentes primeiro)
+        deliveries.sort(key=lambda d: d.created_at, reverse=True)
+        
+        return deliveries[:limit]
+    
+    def get_webhook_stats(self, webhook_id: str) -> Dict[str, Any]:
+        """Obter estatísticas de um webhook"""
+        webhook = self.get_webhook(webhook_id)
+        if not webhook:
+            return {}
+        
+        deliveries = [d for d in self.deliveries if d.webhook_id == webhook_id]
+        
+        successful = len([d for d in deliveries if d.status_code and d.status_code < 400])
+        failed = len(deliveries) - successful
+        
+        return {
+            "webhook_id": webhook_id,
+            "url": webhook.url,
+            "active": webhook.active,
+            "events": webhook.events,
+            "created_at": webhook.created_at.isoformat(),
+            "last_triggered": webhook.last_triggered.isoformat() if webhook.last_triggered else None,
+            "total_deliveries": len(deliveries),
+            "successful_deliveries": successful,
+            "failed_deliveries": failed,
+            "success_rate": (successful / len(deliveries) * 100) if deliveries else 0
+        }
+    
+    def _generate_webhook_id(self, url: str) -> str:
+        """Gerar ID único para webhook"""
+        timestamp = str(int(time.time()))
+        data = f"{url}:{timestamp}"
+        return hashlib.md5(data.encode()).hexdigest()[:16]
+    
+    def _generate_delivery_id(self) -> str:
+        """Gerar ID único para entrega"""
+        timestamp = str(int(time.time() * 1000))
+        return f"del_{timestamp}_{len(self.deliveries)}"
+    
+    def _validate_url(self, url: str) -> bool:
+        """Validar URL do webhook"""
+        try:
+            result = urlparse(url)
+            return all([result.scheme, result.netloc]) and result.scheme in ['http', 'https']
+        except:
             return False
     
-    def _create_signature(self, payload: str, secret: str) -> str:
-        """Cria assinatura HMAC para webhook"""
+    def _generate_signature(self, payload: Dict[str, Any], secret: str) -> str:
+        """Gerar assinatura HMAC para webhook"""
+        payload_str = json.dumps(payload, sort_keys=True, separators=(',', ':'))
         signature = hmac.new(
-            secret.encode('utf-8'),
-            payload.encode('utf-8'),
+            secret.encode(),
+            payload_str.encode(),
             hashlib.sha256
         ).hexdigest()
         return f"sha256={signature}"
     
-    def verify_signature(self, payload: str, signature: str, secret: str) -> bool:
-        """Verifica assinatura HMAC de webhook"""
-        expected_signature = self._create_signature(payload, secret)
-        return hmac.compare_digest(signature, expected_signature)
-    
-    async def retry_failed_deliveries(self):
-        """Reprocessa entregas falhadas"""
-        now = datetime.utcnow()
-        retried = 0
+    async def cleanup_old_deliveries(self, days: int = 30):
+        """Limpar entregas antigas"""
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
         
-        for delivery in self.deliveries.values():
-            if (delivery.status == WebhookStatus.RETRYING and 
-                delivery.next_retry and 
-                delivery.next_retry <= now and
-                delivery.attempts < self.max_retries):
-                
-                endpoint = self.endpoints.get(delivery.endpoint_id)
-                if endpoint and endpoint.active:
-                    # Recriar payload
-                    payload = WebhookPayload(**delivery.payload)
-                    
-                    # Tentar novamente
-                    success = await self._attempt_delivery(endpoint, delivery, payload)
-                    
-                    if success:
-                        delivery.status = WebhookStatus.DELIVERED
-                        delivery.delivered_at = now
-                        endpoint.last_delivery = now
-                    else:
-                        if delivery.attempts >= self.max_retries:
-                            delivery.status = WebhookStatus.EXPIRED
-                        else:
-                            delay = self.retry_delays[min(delivery.attempts, len(self.retry_delays) - 1)]
-                            delivery.next_retry = now + timedelta(seconds=delay)
-                    
-                    retried += 1
-        
-        if retried > 0:
-            logger.info(f"🔄 Reprocessadas {retried} entregas de webhook")
-    
-    def get_endpoint_stats(self, endpoint_id: str) -> Dict[str, Any]:
-        """Obtém estatísticas de um endpoint"""
-        if endpoint_id not in self.endpoints:
-            return {}
-        
-        endpoint = self.endpoints[endpoint_id]
-        deliveries = [d for d in self.deliveries.values() if d.endpoint_id == endpoint_id]
-        
-        total = len(deliveries)
-        delivered = len([d for d in deliveries if d.status == WebhookStatus.DELIVERED])
-        failed = len([d for d in deliveries if d.status == WebhookStatus.FAILED])
-        pending = len([d for d in deliveries if d.status in [WebhookStatus.PENDING, WebhookStatus.RETRYING]])
-        
-        return {
-            "endpoint_id": endpoint_id,
-            "url": endpoint.url,
-            "active": endpoint.active,
-            "events": endpoint.events,
-            "total_deliveries": total,
-            "successful_deliveries": delivered,
-            "failed_deliveries": failed,
-            "pending_deliveries": pending,
-            "success_rate": (delivered / total * 100) if total > 0 else 0,
-            "last_delivery": endpoint.last_delivery,
-            "created_at": endpoint.created_at
-        }
-    
-    def get_delivery_details(self, delivery_id: str) -> Optional[Dict[str, Any]]:
-        """Obtém detalhes de uma entrega"""
-        if delivery_id not in self.deliveries:
-            return None
-        
-        delivery = self.deliveries[delivery_id]
-        return asdict(delivery)
-    
-    def cleanup_old_deliveries(self, days: int = 30):
-        """Remove entregas antigas"""
-        cutoff = datetime.utcnow() - timedelta(days=days)
-        
-        old_deliveries = [
-            delivery_id for delivery_id, delivery in self.deliveries.items()
-            if delivery.created_at < cutoff
+        old_count = len(self.deliveries)
+        self.deliveries = [
+            d for d in self.deliveries 
+            if d.created_at > cutoff_date
         ]
         
-        for delivery_id in old_deliveries:
-            del self.deliveries[delivery_id]
+        removed = old_count - len(self.deliveries)
+        if removed > 0:
+            logger.info(f"Removidas {removed} entregas antigas (>{days} dias)")
+    
+    async def health_check(self) -> Dict[str, Any]:
+        """Health check do sistema de webhooks"""
+        active_webhooks = len([w for w in self.webhooks.values() if w.active])
+        total_webhooks = len(self.webhooks)
         
-        logger.info(f"🧹 Removidas {len(old_deliveries)} entregas antigas")
-
+        recent_deliveries = [
+            d for d in self.deliveries 
+            if d.created_at > datetime.utcnow() - timedelta(hours=24)
+        ]
+        
+        successful_recent = len([
+            d for d in recent_deliveries 
+            if d.status_code and d.status_code < 400
+        ])
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "webhooks": {
+                "total": total_webhooks,
+                "active": active_webhooks,
+                "inactive": total_webhooks - active_webhooks
+            },
+            "deliveries_24h": {
+                "total": len(recent_deliveries),
+                "successful": successful_recent,
+                "failed": len(recent_deliveries) - successful_recent,
+                "success_rate": (successful_recent / len(recent_deliveries) * 100) if recent_deliveries else 0
+            },
+            "total_deliveries": len(self.deliveries)
+        }
+    
+    async def shutdown(self):
+        """Encerrar o gerenciador de webhooks"""
+        await self.client.aclose()
+        logger.info("Webhook Manager encerrado")
 
 # Instância global do gerenciador
 webhook_manager = WebhookManager()
 
+# Funções de conveniência para integração com CWB Hub
+async def register_cwb_webhook(url: str, events: List[str], secret: Optional[str] = None) -> str:
+    """Registrar webhook para eventos do CWB Hub"""
+    return webhook_manager.register_webhook(url, events, secret)
 
-# Funções de conveniência
-async def send_project_created_webhook(project_id: int, user_id: int, project_data: Dict[str, Any]):
-    """Envia webhook de projeto criado"""
-    return await webhook_manager.send_webhook(
-        WebhookEvent.PROJECT_CREATED,
-        project_data,
-        user_id=user_id,
-        project_id=project_id
-    )
+async def trigger_cwb_event(event: str, data: Dict[str, Any]) -> List[WebhookDelivery]:
+    """Disparar evento do CWB Hub"""
+    return await webhook_manager.trigger_event(event, data)
 
+# Eventos específicos do CWB Hub
+async def trigger_analysis_started(session_id: str, request: str):
+    """Disparar evento de análise iniciada"""
+    await trigger_cwb_event(WebhookEvent.ANALYSIS_STARTED.value, {
+        "session_id": session_id,
+        "request": request,
+        "timestamp": datetime.utcnow().isoformat()
+    })
 
-async def send_session_completed_webhook(session_id: str, user_id: int, session_data: Dict[str, Any]):
-    """Envia webhook de sessão completada"""
-    return await webhook_manager.send_webhook(
-        WebhookEvent.SESSION_COMPLETED,
-        session_data,
-        user_id=user_id,
-        session_id=session_id
-    )
+async def trigger_analysis_completed(session_id: str, analysis: str, stats: Dict[str, Any]):
+    """Disparar evento de análise concluída"""
+    await trigger_cwb_event(WebhookEvent.ANALYSIS_COMPLETED.value, {
+        "session_id": session_id,
+        "analysis": analysis,
+        "stats": stats,
+        "timestamp": datetime.utcnow().isoformat()
+    })
 
-
-async def send_error_webhook(error_data: Dict[str, Any], user_id: Optional[int] = None):
-    """Envia webhook de erro"""
-    return await webhook_manager.send_webhook(
-        WebhookEvent.ERROR_OCCURRED,
-        error_data,
-        user_id=user_id
-    )
-
-
-# Função para inicializar webhooks padrão
-def initialize_default_webhooks():
-    """Inicializa webhooks padrão para desenvolvimento"""
-    
-    # Webhook de desenvolvimento local
-    dev_endpoint = WebhookEndpoint(
-        id="dev_local",
-        url="http://localhost:3000/webhooks/cwbhub",
-        secret="dev_secret_key_2025",
-        events=[event.value for event in WebhookEvent],
-        active=True
-    )
-    
-    webhook_manager.register_endpoint(dev_endpoint)
-    
-    # Webhook para Slack (se configurado)
-    slack_webhook_url = os.getenv("SLACK_WEBHOOK_URL")
-    if slack_webhook_url:
-        slack_endpoint = WebhookEndpoint(
-            id="slack_notifications",
-            url=slack_webhook_url,
-            secret=os.getenv("SLACK_WEBHOOK_SECRET", "slack_secret"),
-            events=[
-                WebhookEvent.PROJECT_COMPLETED.value,
-                WebhookEvent.ERROR_OCCURRED.value
-            ],
-            active=True
-        )
-        webhook_manager.register_endpoint(slack_endpoint)
-    
-    # Webhook para Teams (se configurado)
-    teams_webhook_url = os.getenv("TEAMS_WEBHOOK_URL")
-    if teams_webhook_url:
-        teams_endpoint = WebhookEndpoint(
-            id="teams_notifications",
-            url=teams_webhook_url,
-            secret=os.getenv("TEAMS_WEBHOOK_SECRET", "teams_secret"),
-            events=[
-                WebhookEvent.PROJECT_COMPLETED.value,
-                WebhookEvent.SESSION_COMPLETED.value
-            ],
-            active=True
-        )
-        webhook_manager.register_endpoint(teams_endpoint)
-
-
-# Task para retry automático
-async def webhook_retry_task():
-    """Task para reprocessar webhooks falhados"""
-    while True:
-        try:
-            await webhook_manager.retry_failed_deliveries()
-            await asyncio.sleep(300)  # 5 minutos
-        except Exception as e:
-            logger.error(f"❌ Erro no retry task: {e}")
-            await asyncio.sleep(60)  # 1 minuto em caso de erro
-
+async def trigger_iteration_completed(session_id: str, refined_analysis: str, iteration_count: int):
+    """Disparar evento de iteração concluída"""
+    await trigger_cwb_event(WebhookEvent.ITERATION_COMPLETED.value, {
+        "session_id": session_id,
+        "refined_analysis": refined_analysis,
+        "iteration_count": iteration_count,
+        "timestamp": datetime.utcnow().isoformat()
+    })
 
 if __name__ == "__main__":
-    # Teste do sistema de webhooks
-    print("🔗 CWB HUB WEBHOOK MANAGER")
-    print("=" * 40)
-    
+    # Exemplo de uso
     async def test_webhooks():
-        # Inicializar webhooks padrão
-        initialize_default_webhooks()
+        # Registrar webhook de teste
+        webhook_id = await register_cwb_webhook(
+            "https://httpbin.org/post",
+            [WebhookEvent.ANALYSIS_COMPLETED.value],
+            secret="test-secret"
+        )
         
-        # Testar envio de webhook
-        test_data = {
-            "project_id": 123,
-            "title": "Sistema de E-commerce",
-            "status": "completed",
-            "confidence": 94.4
-        }
+        print(f"Webhook registrado: {webhook_id}")
         
-        delivery_ids = await send_project_created_webhook(123, 1, test_data)
-        print(f"✅ Webhooks enviados: {len(delivery_ids)}")
+        # Disparar evento de teste
+        await trigger_analysis_completed(
+            "test_session",
+            "Análise de teste concluída",
+            {"collaborations": 5, "confidence": 0.95}
+        )
         
-        # Mostrar estatísticas
-        for endpoint_id in webhook_manager.endpoints.keys():
-            stats = webhook_manager.get_endpoint_stats(endpoint_id)
-            print(f"📊 {endpoint_id}: {stats['success_rate']:.1f}% success rate")
+        # Ver estatísticas
+        stats = webhook_manager.get_webhook_stats(webhook_id)
+        print(f"Estatísticas: {stats}")
+        
+        # Health check
+        health = await webhook_manager.health_check()
+        print(f"Health: {health}")
+        
+        await webhook_manager.shutdown()
     
     asyncio.run(test_webhooks())
-    print("✅ Sistema de webhooks testado com sucesso!")

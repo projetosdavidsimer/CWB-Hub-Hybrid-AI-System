@@ -1,37 +1,19 @@
-# CWB Hub Integrations Requirements
+# CWB Hub Integrations - Requirements
+# Melhoria #3 Fase 2 - Slack Bot + Webhooks
 
-# Core FastAPI
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-pydantic>=2.5.0
-
-# Slack Integration
+# Slack Bot Dependencies
 slack-bolt>=1.18.0
 slack-sdk>=3.26.0
 
-# Microsoft Teams Integration
-botbuilder-core>=4.15.0
-botbuilder-schema>=4.15.0
+# Webhook Dependencies
+httpx>=0.25.2
 aiohttp>=3.9.0
-
-# Webhooks
-httpx>=0.25.0
-cryptography>=41.0.0
-
-# Rate Limiting
-redis>=5.0.0
-hiredis>=2.2.0
-
-# Authentication
-pyjwt>=2.8.0
-passlib[bcrypt]>=1.7.4
 
 # Utilities
 python-dotenv>=1.0.0
-structlog>=23.2.0
-celery>=5.3.0
+pydantic>=2.5.0
 
-# Development
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-httpx>=0.25.0
+# Development and Testing
+pytest>=7.4.3
+pytest-asyncio>=0.21.1
+pytest-mock>=3.12.0
