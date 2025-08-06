@@ -40,17 +40,65 @@ async def main():
         print("Sistema inicializado com sucesso!")
         print(f"Agentes ativos: {', '.join(orchestrator.get_active_agents())}")
         
-        # Exemplo de solicitação
+        # Exemplo de solicitação - PROJETO RESTAURANTE
         user_request = """
-        Preciso desenvolver um aplicativo mobile para gestão de projetos que permita:
-        - Colaboração em tempo real entre equipes
-        - Sincronização offline
-        - Dashboard com métricas de performance
-        - Integração com ferramentas existentes
-        - Interface intuitiva e acessível
+        PROJETO: Sistema de Gestão de Restaurante
+        CRIADO POR: David Simer
         
-        O aplicativo deve ser escalável para suportar milhares de usuários e 
-        garantir alta disponibilidade e segurança dos dados.
+        CONTEXTO:
+        Sou proprietário de um restaurante familiar e preciso automatizar
+        os processos para melhorar eficiência e reduzir erros.
+        
+        SITUAÇÃO ATUAL:
+        - 15 mesas, 5 garçons
+        - Comandas em papel (muitos erros)
+        - Controle de estoque manual
+        - Relatórios financeiros básicos
+        - Sistema de delivery desorganizado
+        
+        FUNCIONALIDADES DESEJADAS:
+        
+        📋 CONTROLE DE PEDIDOS:
+        - Comandas digitais por mesa
+        - Status dos pedidos em tempo real
+        - Comunicação salão-cozinha
+        - Histórico de pedidos
+        
+        📦 GESTÃO DE ESTOQUE:
+        - Controle de ingredientes
+        - Alertas de estoque baixo
+        - Relatórios de consumo
+        
+        💰 CONTROLE FINANCEIRO:
+        - Vendas diárias/mensais
+        - Relatórios de lucro
+        - Fechamento de caixa
+        
+        📱 APP PARA GARÇONS:
+        - Interface simples
+        - Anotar pedidos rapidamente
+        - Ver status das mesas
+        - Funcionalidade offline básica
+        
+        🍽️ CARDÁPIO DIGITAL:
+        - Para clientes consultarem
+        - Fácil atualização
+        - Fotos dos pratos
+        
+        🚚 SISTEMA DE DELIVERY:
+        - Integração WhatsApp
+        - Controle de entregas
+        - Cálculo de taxas
+        
+        REQUISITOS:
+        - Sistema web responsivo
+        - App mobile para garçons
+        - Interface muito simples (equipe não técnica)
+        - Backup automático
+        - Funciona offline básico
+        
+        CRONOGRAMA: MVP em 2-3 meses
+        ORÇAMENTO: Moderado, tecnologias gratuitas preferencialmente
         """
         
         print("\n" + "="*80)

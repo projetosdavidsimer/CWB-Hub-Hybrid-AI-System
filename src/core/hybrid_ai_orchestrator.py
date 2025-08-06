@@ -78,14 +78,25 @@ class HybridAIOrchestrator:
         
     async def initialize_agents(self):
         """Inicializa todos os agentes da equipe CWB Hub"""
-        from ..agents.ana_beatriz_costa import AnaBeatrizCosta
-        from ..agents.carlos_eduardo_santos import CarlosEduardoSantos
-        from ..agents.gabriel_mendes import GabrielMendes
-        from ..agents.isabella_santos import IsabellaSantos
-        from ..agents.lucas_pereira import LucasPereira
-        from ..agents.mariana_rodrigues import MarianaRodrigues
-        from ..agents.pedro_henrique_almeida import PedroHenriqueAlmeida
-        from ..agents.sofia_oliveira import SofiaOliveira
+        try:
+            from ..agents.ana_beatriz_costa import AnaBeatrizCosta
+            from ..agents.carlos_eduardo_santos import CarlosEduardoSantos
+            from ..agents.gabriel_mendes import GabrielMendes
+            from ..agents.isabella_santos import IsabellaSantos
+            from ..agents.lucas_pereira import LucasPereira
+            from ..agents.mariana_rodrigues import MarianaRodrigues
+            from ..agents.pedro_henrique_almeida import PedroHenriqueAlmeida
+            from ..agents.sofia_oliveira import SofiaOliveira
+        except ImportError:
+            # Fallback para importação absoluta
+            from agents.ana_beatriz_costa import AnaBeatrizCosta
+            from agents.carlos_eduardo_santos import CarlosEduardoSantos
+            from agents.gabriel_mendes import GabrielMendes
+            from agents.isabella_santos import IsabellaSantos
+            from agents.lucas_pereira import LucasPereira
+            from agents.mariana_rodrigues import MarianaRodrigues
+            from agents.pedro_henrique_almeida import PedroHenriqueAlmeida
+            from agents.sofia_oliveira import SofiaOliveira
         
         # Instanciar todos os agentes
         self.agents = {

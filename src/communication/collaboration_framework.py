@@ -264,7 +264,10 @@ class CollaborationFramework:
             collaboration_response = await requester.collaborate_with(collaborator_id, collaboration_context)
             
             # Criar resposta de colaboração
-            from ..core.hybrid_ai_orchestrator import AgentResponse, ProcessPhase
+            try:
+                from ..core.hybrid_ai_orchestrator import AgentResponse, ProcessPhase
+            except ImportError:
+                from core.hybrid_ai_orchestrator import AgentResponse, ProcessPhase
             
             response = AgentResponse(
                 agent_id=requester_id,
@@ -311,7 +314,10 @@ class CollaborationFramework:
 {self._recommend_next_steps(agent_responses)}
             """
             
-            from ..core.hybrid_ai_orchestrator import AgentResponse, ProcessPhase
+            try:
+                from ..core.hybrid_ai_orchestrator import AgentResponse, ProcessPhase
+            except ImportError:
+                from core.hybrid_ai_orchestrator import AgentResponse, ProcessPhase
             
             response = AgentResponse(
                 agent_id="group_discussion",
