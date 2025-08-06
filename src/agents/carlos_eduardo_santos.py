@@ -405,6 +405,66 @@ Arquitetura que facilita testes e qualidade:
 - Security scanning
         """
     
+    async def _collaborate_with_designer(self, context: str) -> str:
+        return f"""
+**Arquitetura-Design (Isabella):**
+
+Suporte arquitetural para implementação de design:
+
+{context}
+
+**Estrutura para UI/UX:**
+- Component-based architecture
+- State management centralizado
+- Separation of concerns (presentation/logic)
+- Responsive design patterns
+
+**Performance de Interface:**
+- Lazy loading de componentes
+- Virtual scrolling para listas grandes
+- Code splitting por rotas
+- Caching de assets estáticos
+
+**Integração Frontend-Backend:**
+- API design orientado a UI needs
+- Real-time updates via WebSockets
+- Optimistic UI updates
+- Error boundary patterns
+
+**Escalabilidade de UI:**
+- Design system como biblioteca
+- Micro-frontends quando apropriado
+- Progressive Web App capabilities
+- Accessibility by design
+        """
+    
+    async def _collaborate_with_pm(self, context: str) -> str:
+        return f"""
+**Planejamento Técnico (Pedro):**
+
+Tradução de requisitos em arquitetura técnica:
+
+{context}
+
+**Estimativas Técnicas:**
+- Complexidade arquitetural por feature
+- Dependências técnicas críticas
+- Riscos de implementação
+- Timeline realista baseado em arquitetura
+
+**Marcos Técnicos:**
+- Proof of concepts necessários
+- Decisões arquiteturais críticas
+- Integrações complexas
+- Validações de performance
+
+**Recursos Necessários:**
+- Skills técnicos específicos
+- Ferramentas e infraestrutura
+- Tempo para research e spikes
+- Revisões arquiteturais
+        """
+    
     async def _generic_collaboration(self, agent_id: str, context: str) -> str:
         return f"""
 **Orientação Arquitetural para {agent_id}:**

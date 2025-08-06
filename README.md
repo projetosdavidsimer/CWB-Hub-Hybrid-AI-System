@@ -53,20 +53,66 @@ src/
 
 ## 🛠️ Instalação
 
-1. Clone o repositório:
+### Método 1: Instalação Automática (Recomendado)
 ```bash
-git clone <repository-url>
-cd cwb-hub-hybrid-ai
+# Clone o repositório
+git clone https://github.com/projetosdavidsimer/CWB-Hub-Hybrid-AI-System.git
+cd CWB-Hub-Hybrid-AI-System
+
+# Execute o instalador inteligente
+python install_dependencies.py
 ```
 
-2. Instale as dependências:
+### Método 2: Instalação Manual
 ```bash
+# 1. Atualize o pip
+python -m pip install --upgrade pip
+
+# 2. Instale as dependências
 pip install -r requirements.txt
+
+# 3. Execute o sistema
+python main.py
 ```
 
-3. Execute o exemplo:
+### Método 3: Usando Conda (Mais Estável)
 ```bash
+# Crie ambiente conda
+conda env create -f environment.yml
+
+# Ative o ambiente
+conda activate cwb-hub
+
+# Execute o sistema
 python main.py
+```
+
+### 🔧 Solução de Problemas
+
+**Se encontrar erros de compilação (pydantic-core):**
+
+1. **Windows:**
+   ```bash
+   # Instale Visual Studio Build Tools ou Rust
+   # https://rustup.rs/
+   ```
+
+2. **Linux:**
+   ```bash
+   sudo apt-get install build-essential
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+
+3. **macOS:**
+   ```bash
+   xcode-select --install
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+
+**Alternativa rápida:**
+```bash
+# Use apenas wheels pré-compilados
+pip install --only-binary=all -r requirements.txt
 ```
 
 ## 💡 Exemplo de Uso

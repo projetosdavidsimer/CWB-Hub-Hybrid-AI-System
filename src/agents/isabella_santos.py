@@ -382,6 +382,87 @@ Critérios de qualidade para experiência do usuário:
 - Feedback adequado para ações
         """
     
+    async def _collaborate_with_architect(self, context: str) -> str:
+        return f"""
+**Design-Arquitetura (Carlos):**
+
+Alinhamento entre design e arquitetura técnica:
+
+{context}
+
+**Requisitos de Interface:**
+- Componentes que precisam ser escaláveis
+- Estados de loading e feedback visual
+- Integração com APIs e dados dinâmicos
+- Performance de renderização
+
+**Estrutura de Dados:**
+- Modelagem que suporte a experiência desejada
+- Campos necessários para personalização
+- Estrutura para internacionalização
+- Metadados para analytics de UX
+
+**Considerações Técnicas:**
+- Compatibilidade com diferentes browsers
+- Otimização para dispositivos móveis
+- Acessibilidade programática
+- SEO e estrutura semântica
+        """
+    
+    async def _collaborate_with_cto(self, context: str) -> str:
+        return f"""
+**Design Estratégico (Ana Beatriz):**
+
+Alinhamento do design com visão estratégica:
+
+{context}
+
+**Impacto no Negócio:**
+- Design que suporte objetivos de negócio
+- Experiência que diferencie no mercado
+- Usabilidade que reduza custos de suporte
+- Interface que facilite conversões
+
+**Inovação em UX:**
+- Tendências de design relevantes
+- Oportunidades de diferenciação
+- Tecnologias emergentes em UX
+- Benchmarking com concorrentes
+
+**Escalabilidade de Design:**
+- Design system que cresça com o produto
+- Padrões que suportem internacionalização
+- Flexibilidade para futuras funcionalidades
+- Consistência em múltiplas plataformas
+        """
+    
+    async def _collaborate_with_devops(self, context: str) -> str:
+        return f"""
+**Design-Infraestrutura (Mariana):**
+
+Considerações de design para infraestrutura:
+
+{context}
+
+**Performance Visual:**
+- Otimização de assets e imagens
+- CDN para recursos estáticos
+- Lazy loading de componentes
+- Compressão de recursos
+
+**Monitoramento de UX:**
+- Métricas de performance visual
+- Analytics de comportamento do usuário
+- Testes A/B de interface
+- Alertas para problemas de UX
+
+**Deploy de Design:**
+- Versionamento de design system
+- Rollback de mudanças visuais
+- Testes automatizados de UI
+- Documentação de releases
+        """
+    
     async def _generic_collaboration(self, agent_id: str, context: str) -> str:
         return f"""
 **Perspectiva de Design para {agent_id}:**

@@ -295,6 +295,110 @@ Esta iniciativa requer infraestrutura robusta e escalável:
 - Auditoria e logs centralizados
         """
     
+    async def _collaborate_with_fullstack(self, context: str) -> str:
+        return f"""
+**Direcionamento para Full Stack (Sofia):**
+
+Como CTO, preciso que você implemente esta visão com excelência técnica:
+
+{context}
+
+**Diretrizes de Desenvolvimento:**
+- Priorize clean code e manutenibilidade
+- Implemente testes automatizados abrangentes
+- Considere performance desde o início
+- Mantenha documentação atualizada
+
+**Decisões Tecnológicas:**
+- Use tecnologias maduras e bem suportadas
+- Considere impacto em escalabilidade
+- Implemente logging e monitoramento
+- Planeje para internacionalização
+
+**Qualidade e Entrega:**
+- Code review rigoroso
+- Deploy automatizado
+- Rollback strategy definida
+        """
+    
+    async def _collaborate_with_mobile(self, context: str) -> str:
+        return f"""
+**Estratégia Mobile (Gabriel):**
+
+A experiência mobile é crítica para nosso sucesso:
+
+{context}
+
+**Visão Mobile:**
+- Mobile-first approach
+- Performance excepcional
+- Experiência offline robusta
+- Sincronização inteligente
+
+**Considerações Estratégicas:**
+- Suporte a múltiplas plataformas
+- App store optimization
+- Analytics e métricas de uso
+- Estratégia de updates
+
+**Diferenciação:**
+- Features inovadoras
+- UX superior à concorrência
+- Integração com ecossistema
+        """
+    
+    async def _collaborate_with_designer(self, context: str) -> str:
+        return f"""
+**Visão de Design (Isabella):**
+
+O design é fundamental para nossa diferenciação no mercado:
+
+{context}
+
+**Estratégia de Design:**
+- Brand experience consistente
+- Usabilidade excepcional
+- Acessibilidade universal
+- Design system escalável
+
+**Inovação em UX:**
+- Pesquisa com usuários
+- Testes A/B contínuos
+- Métricas de satisfação
+- Benchmarking competitivo
+
+**Impacto no Negócio:**
+- Redução de churn
+- Aumento de conversão
+- Diferenciação competitiva
+        """
+    
+    async def _collaborate_with_qa(self, context: str) -> str:
+        return f"""
+**Qualidade Estratégica (Lucas):**
+
+A qualidade é inegociável em nossa estratégia:
+
+{context}
+
+**Padrões de Qualidade:**
+- Zero defeitos críticos em produção
+- Cobertura de testes > 90%
+- Performance dentro dos SLAs
+- Segurança validada continuamente
+
+**Estratégia de Testes:**
+- Automação máxima
+- Testes em produção
+- Chaos engineering
+- Validação contínua
+
+**Métricas de Sucesso:**
+- MTTR (Mean Time To Recovery)
+- Defect escape rate
+- Customer satisfaction
+        """
+    
     async def _generic_collaboration(self, agent_id: str, context: str) -> str:
         return f"""
 **Direcionamento Estratégico para {agent_id}:**
