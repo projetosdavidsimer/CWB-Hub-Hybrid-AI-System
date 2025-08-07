@@ -1,0 +1,1 @@
+# CWB Hub API Schemas
