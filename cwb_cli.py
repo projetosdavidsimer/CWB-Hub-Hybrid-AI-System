@@ -18,9 +18,13 @@ import logging
 
 # Adicionar src ao path
 sys.path.append(str(Path(__file__).parent / "src"))
+sys.path.append(str(Path(__file__).parent))
 
 try:
     from src.core.hybrid_ai_orchestrator import HybridAIOrchestrator
+    from reporting.core.report_engine import ReportEngine
+    from reporting.core.scheduler import ReportScheduler
+    from reporting.models.report_models import ReportType, ReportFormat, ReportFrequency
 except ImportError as e:
     print(f"❌ Erro ao importar módulos do sistema: {e}")
     print("💡 Certifique-se de que o sistema está instalado corretamente.")
@@ -34,6 +38,8 @@ class CWBHubCLI:
     def __init__(self):
         self.orchestrator: Optional[HybridAIOrchestrator] = None
         self.current_session_id: Optional[str] = None
+        self.report_engine: Optional[ReportEngine] = None
+        self.scheduler: Optional[ReportScheduler] = None
         
     async def initialize(self, verbose: bool = False):
         """Inicializa o sistema CWB Hub"""
@@ -48,11 +54,17 @@ class CWBHubCLI:
         
         try:
             await self.orchestrator.initialize_agents()
+            
+            # Inicializar sistema de relatórios
+            self.report_engine = ReportEngine(data_collector=None)  # Será criado internamente
+            self.scheduler = ReportScheduler(self.report_engine)
+            
             print("✅ Sistema inicializado com sucesso!")
             
             if verbose:
                 active_agents = self.orchestrator.get_active_agents()
                 print(f"👥 Agentes ativos: {', '.join(active_agents)}")
+                print("📈 Sistema de relatórios carregado")
                 
         except Exception as e:
             print(f"❌ Erro ao inicializar sistema: {e}")
@@ -147,6 +159,8 @@ class CWBHubCLI:
     
     async def shutdown(self):
         """Encerra o sistema"""
+        if self.scheduler:
+            await self.scheduler.stop()
         if self.orchestrator:
             print("🔚 Encerrando sistema...")
             await self.orchestrator.shutdown()
@@ -312,7 +326,196 @@ async def cmd_agents(args):
             description = agent_descriptions.get(agent, f"🤖 {agent}")
             print(f"✅ {description}")
         
-        print(f"\n📊 Total de agentes ativos: {len(active_agents)}")
+        print(f"\n📈 Total de agentes ativos: {len(active_agents)}")
+        
+    finally:
+        await cli.shutdown()
+
+
+async def cmd_report_generate(args):
+    """Comando para gerar relatórios"""
+    cli = CWBHubCLI()
+    
+    try:
+        await cli.initialize(verbose=args.verbose)
+        
+        # Determinar tipo de relatório
+        report_type = ReportType(args.type)
+        
+        # Determinar formatos de saída
+        output_formats = [ReportFormat(fmt) for fmt in args.formats] if args.formats else [ReportFormat.HTML]
+        
+        print(f"📈 Gerando relatório: {report_type.value}")
+        print(f"📝 Formatos: {', '.join([fmt.value for fmt in output_formats])}")
+        
+        # Gerar relatório
+        result = await cli.report_engine.generate_report(
+            report_type=report_type,
+            output_formats=output_formats
+        )
+        
+        if result.status.value == "completed":
+            print("✅ Relatório gerado com sucesso!")
+            print(f"🕰️ Tempo de execução: {result.duration_seconds:.2f} segundos")
+            
+            if result.output_files:
+                print("📁 Arquivos gerados:")
+                for file_path in result.output_files:
+                    print(f"  • {file_path}")
+            
+            # Copiar para diretório de saída se especificado
+            if args.output_dir:
+                import shutil
+                output_dir = Path(args.output_dir)
+                output_dir.mkdir(exist_ok=True)
+                
+                for file_path in result.output_files:
+                    src = Path(file_path)
+                    dst = output_dir / src.name
+                    shutil.copy2(src, dst)
+                    print(f"  💾 Copiado para: {dst}")
+        else:
+            print(f"❌ Falha na geração do relatório: {result.error_message}")
+        
+    finally:
+        await cli.shutdown()
+
+
+async def cmd_report_schedule(args):
+    """Comando para gerenciar agendamentos de relatórios"""
+    cli = CWBHubCLI()
+    
+    try:
+        await cli.initialize(verbose=args.verbose)
+        await cli.scheduler.start()
+        
+        if args.action == "list":
+            # Listar agendamentos
+            schedules = cli.scheduler.list_schedules()
+            
+            if not schedules:
+                print("📅 Nenhum agendamento encontrado.")
+            else:
+                print("📅 AGENDAMENTOS DE RELATÓRIOS")
+                print("=" * 60)
+                
+                for schedule in schedules:
+                    status = "✅ Ativo" if schedule.get("is_active", True) else "⏸️ Pausado"
+                    print(f"🔹 {schedule['schedule_id']}")
+                    print(f"   Tipo: {schedule['report_type']}")
+                    print(f"   Frequência: {schedule['frequency']}")
+                    print(f"   Status: {status}")
+                    print(f"   Última execução: {schedule.get('last_run', 'Nunca')}")
+                    print(f"   Próxima execução: {schedule.get('next_run', 'N/A')}")
+                    print(f"   Execuções: {schedule.get('success_count', 0)} sucessos, {schedule.get('error_count', 0)} erros")
+                    print()
+        
+        elif args.action == "add":
+            # Adicionar agendamento
+            report_type = ReportType(args.type)
+            frequency = ReportFrequency(args.frequency)
+            output_formats = [ReportFormat(fmt) for fmt in args.formats] if args.formats else [ReportFormat.HTML]
+            
+            schedule_id = args.schedule_id or f"{report_type.value}_{frequency.value}"
+            
+            success = await cli.scheduler.schedule_report(
+                schedule_id=schedule_id,
+                report_type=report_type,
+                frequency=frequency,
+                output_formats=output_formats,
+                cron_expression=args.cron,
+                recipients=args.recipients or []
+            )
+            
+            if success:
+                print(f"✅ Agendamento criado: {schedule_id}")
+            else:
+                print(f"❌ Falha ao criar agendamento: {schedule_id}")
+        
+        elif args.action == "remove":
+            # Remover agendamento
+            if not args.schedule_id:
+                print("❌ ID do agendamento é obrigatório para remoção")
+                return
+            
+            success = await cli.scheduler.remove_schedule(args.schedule_id)
+            
+            if success:
+                print(f"✅ Agendamento removido: {args.schedule_id}")
+            else:
+                print(f"❌ Falha ao remover agendamento: {args.schedule_id}")
+        
+        elif args.action == "pause":
+            # Pausar agendamento
+            if not args.schedule_id:
+                print("❌ ID do agendamento é obrigatório")
+                return
+            
+            success = await cli.scheduler.pause_schedule(args.schedule_id)
+            
+            if success:
+                print(f"⏸️ Agendamento pausado: {args.schedule_id}")
+            else:
+                print(f"❌ Falha ao pausar agendamento: {args.schedule_id}")
+        
+        elif args.action == "resume":
+            # Resumir agendamento
+            if not args.schedule_id:
+                print("❌ ID do agendamento é obrigatório")
+                return
+            
+            success = await cli.scheduler.resume_schedule(args.schedule_id)
+            
+            if success:
+                print(f"▶️ Agendamento resumido: {args.schedule_id}")
+            else:
+                print(f"❌ Falha ao resumir agendamento: {args.schedule_id}")
+        
+        elif args.action == "status":
+            # Status do scheduler
+            status = cli.scheduler.get_scheduler_status()
+            
+            print("📈 STATUS DO SCHEDULER")
+            print("=" * 40)
+            print(f"Executando: {'Sim' if status['running'] else 'Não'}")
+            print(f"Total de jobs: {status['total_jobs']}")
+            print(f"Agendamentos ativos: {status['active_schedules']}")
+            print(f"Total de agendamentos: {status['total_schedules']}")
+            
+            if status['next_jobs']:
+                print("\n🕰️ Próximos jobs:")
+                for job in status['next_jobs']:
+                    print(f"  • {job['name']}: {job['next_run'] or 'N/A'}")
+        
+    finally:
+        await cli.shutdown()
+
+
+async def cmd_report_dashboard(args):
+    """Comando para gerar dashboard"""
+    cli = CWBHubCLI()
+    
+    try:
+        await cli.initialize(verbose=args.verbose)
+        
+        print("📈 Gerando dashboard em tempo real...")
+        
+        # Gerar dashboard
+        dashboard_html = await cli.report_engine.generate_dashboard_report()
+        
+        # Salvar dashboard
+        output_file = args.output or "dashboard.html"
+        output_path = Path(output_file)
+        
+        output_path.write_text(dashboard_html, encoding='utf-8')
+        
+        print(f"✅ Dashboard gerado: {output_path.absolute()}")
+        
+        # Abrir no navegador se solicitado
+        if args.open:
+            import webbrowser
+            webbrowser.open(f"file://{output_path.absolute()}")
+            print("🌐 Dashboard aberto no navegador")
         
     finally:
         await cli.shutdown()
@@ -340,6 +543,18 @@ Exemplos de uso:
   
   # Listar agentes ativos
   python cwb_cli.py agents
+  
+  # Gerar relatório executivo em PDF
+  python cwb_cli.py report-generate executive_summary --formats html pdf
+  
+  # Criar agendamento diário de relatórios
+  python cwb_cli.py report-schedule add --type executive_summary --frequency daily
+  
+  # Listar agendamentos
+  python cwb_cli.py report-schedule list
+  
+  # Gerar dashboard e abrir no navegador
+  python cwb_cli.py dashboard --open
   
   # Consulta com estatísticas detalhadas
   python cwb_cli.py query "Desenvolver API REST" --stats --verbose
@@ -382,6 +597,36 @@ Criado por David Simer - CWB Hub Hybrid AI System
     # Comando agents
     agents_parser = subparsers.add_parser('agents', help='Listar agentes ativos')
     agents_parser.set_defaults(func=cmd_agents)
+    
+    # Comando report-generate
+    report_gen_parser = subparsers.add_parser('report-generate', help='Gerar relatórios')
+    report_gen_parser.add_argument('type', choices=['executive_summary', 'agent_performance', 'collaboration_stats', 'system_usage', 'quality_analysis'],
+                                  help='Tipo do relatório')
+    report_gen_parser.add_argument('--formats', nargs='+', choices=['html', 'pdf', 'json', 'excel'],
+                                  default=['html'], help='Formatos de saída')
+    report_gen_parser.add_argument('--output-dir', help='Diretório para salvar os arquivos')
+    report_gen_parser.set_defaults(func=cmd_report_generate)
+    
+    # Comando report-schedule
+    report_sched_parser = subparsers.add_parser('report-schedule', help='Gerenciar agendamentos')
+    report_sched_parser.add_argument('action', choices=['list', 'add', 'remove', 'pause', 'resume', 'status'],
+                                    help='Ação a executar')
+    report_sched_parser.add_argument('--type', choices=['executive_summary', 'agent_performance', 'collaboration_stats', 'system_usage', 'quality_analysis'],
+                                    help='Tipo do relatório (para add)')
+    report_sched_parser.add_argument('--frequency', choices=['daily', 'weekly', 'monthly', 'hourly'],
+                                    help='Frequência (para add)')
+    report_sched_parser.add_argument('--schedule-id', help='ID do agendamento')
+    report_sched_parser.add_argument('--formats', nargs='+', choices=['html', 'pdf', 'json', 'excel'],
+                                    help='Formatos de saída (para add)')
+    report_sched_parser.add_argument('--cron', help='Expressão cron customizada')
+    report_sched_parser.add_argument('--recipients', nargs='+', help='Emails dos destinatários')
+    report_sched_parser.set_defaults(func=cmd_report_schedule)
+    
+    # Comando dashboard
+    dashboard_parser = subparsers.add_parser('dashboard', help='Gerar dashboard')
+    dashboard_parser.add_argument('--output', '-o', default='dashboard.html', help='Arquivo de saída')
+    dashboard_parser.add_argument('--open', action='store_true', help='Abrir no navegador')
+    dashboard_parser.set_defaults(func=cmd_report_dashboard)
     
     # Parse argumentos
     args = parser.parse_args()

@@ -17,6 +17,7 @@ from .providers.openai_provider import OpenAIProvider
 from .providers.anthropic_provider import AnthropicProvider
 from .providers.gemini_provider import GeminiProvider
 from .cache_manager import CacheManager
+from ..utils.advanced_cache import cache_manager as advanced_cache, cache_llm_response, get_cached_llm_response
 from .cost_monitor import CostMonitor
 from .prompt_optimizer import PromptOptimizer
 
@@ -67,6 +68,7 @@ class LLMManager:
     def __init__(self):
         self.providers: Dict[str, BaseLLMProvider] = {}
         self.cache_manager = CacheManager()
+        self.advanced_cache = advanced_cache
         self.cost_monitor = CostMonitor()
         self.prompt_optimizer = PromptOptimizer()
         
@@ -119,8 +121,32 @@ class LLMManager:
         self.stats["total_requests"] += 1
         
         try:
-            # Verificar cache primeiro
+            # Verificar cache avançado primeiro
             if request.use_cache:
+                # Gerar hash do prompt para cache
+                import hashlib
+                prompt_data = f"{request.prompt}:{request.agent_id}:{request.context or ''}"
+                prompt_hash = hashlib.md5(prompt_data.encode()).hexdigest()
+                
+                # Tentar cache avançado
+                cached_content = await get_cached_llm_response(
+                    prompt_hash, 
+                    request.model_preference.value if request.model_preference else "default"
+                )
+                
+                if cached_content:
+                    self.stats["cache_hits"] += 1
+                    return LLMResponse(
+                        content=cached_content,
+                        model_used="cached",
+                        provider="cache",
+                        tokens_used=0,
+                        cost=0.0,
+                        response_time=0.001,
+                        cached=True
+                    )
+                
+                # Fallback para cache original
                 cached_response = await self.cache_manager.get_cached_response(
                     request.prompt, request.agent_id, request.context
                 )
@@ -146,8 +172,20 @@ class LLMManager:
                 response.model_used, response.tokens_used, response.cost
             )
             
-            # Cache da resposta
+            # Cache da resposta no sistema avançado
             if request.use_cache and response.content:
+                # Cache avançado
+                import hashlib
+                prompt_data = f"{request.prompt}:{request.agent_id}:{request.context or ''}"
+                prompt_hash = hashlib.md5(prompt_data.encode()).hexdigest()
+                
+                await cache_llm_response(
+                    prompt_hash, 
+                    response.content,
+                    response.model_used
+                )
+                
+                # Cache original (fallback)
                 await self.cache_manager.cache_response(
                     request.prompt, request.agent_id, request.context, response
                 )
@@ -276,6 +314,8 @@ class LLMManager:
             "providers": {},
             "statistics": self.stats.copy(),
             "cache_status": await self.cache_manager.get_cache_stats(),
+            "advanced_cache_status": await self.advanced_cache.health_check(),
+            "advanced_cache_stats": self.advanced_cache.get_stats(),
             "cost_status": await self.cost_monitor.get_cost_summary()
         }
         
