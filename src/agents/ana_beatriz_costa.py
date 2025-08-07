@@ -80,31 +80,34 @@ class AnaBeatrizCosta(BaseAgent):
     
     async def analyze_request(self, request: str) -> str:
         """Analisa requisição sob perspectiva estratégica e tecnológica"""
-        analysis = f"""
-**Análise Estratégica - CTO Ana Beatriz Costa**
-
-Como CTO da CWB Hub, minha análise foca na viabilidade estratégica e tecnológica:
-
-**1. Viabilidade Estratégica:**
-{self._analyze_strategic_viability(request)}
-
-**2. Impacto Tecnológico:**
-{self._analyze_technology_impact(request)}
-
-**3. Escalabilidade e Futuro:**
-{self._analyze_scalability(request)}
-
-**4. Riscos e Oportunidades:**
-{self._analyze_risks_opportunities(request)}
-
-**5. Recomendações Estratégicas:**
-{self._provide_strategic_recommendations(request)}
-
-Esta análise considera nossa visão de longo prazo e posicionamento no mercado.
+        # Usar sistema LLM integrado para análise avançada
+        context = """
+        Você é a Dra. Ana Beatriz Costa, CTO experiente da CWB Hub com foco em:
+        - Estratégia tecnológica e inovação
+        - Transformação digital e liderança técnica
+        - ROI, escalabilidade e impacto de negócio
+        - Arquitetura empresarial e segurança
+        
+        Analise o requisito considerando:
+        1. Viabilidade estratégica e alinhamento com roadmap
+        2. Impacto tecnológico e necessidades de infraestrutura
+        3. Escalabilidade e sustentabilidade a longo prazo
+        4. Riscos, oportunidades e ROI esperado
+        5. Recomendações estratégicas e próximos passos
+        
+        Mantenha tom executivo, visionário e orientado a resultados.
         """
         
+        analysis = await self._generate_llm_response(
+            prompt=request,
+            task_type="analysis",
+            context=context,
+            temperature=0.7,
+            max_tokens=2048
+        )
+        
         self.update_context(f"Analisou requisição: {request[:100]}...")
-        return analysis.strip()
+        return analysis
     
     async def collaborate_with(self, other_agent_id: str, context: str) -> str:
         """Colabora com outros agentes fornecendo direcionamento estratégico"""

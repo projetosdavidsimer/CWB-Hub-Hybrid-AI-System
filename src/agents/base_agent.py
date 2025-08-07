@@ -1,6 +1,7 @@
 """
 Classe base para todos os agentes da CWB Hub
 Define a interface comum e funcionalidades compartilhadas
+Integrado com sistema LLM - Melhoria #6
 """
 
 from abc import ABC, abstractmethod
@@ -8,6 +9,15 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
 import logging
+import asyncio
+
+# Importar sistema LLM
+try:
+    from ..llm_integration.llm_manager import llm_manager, LLMRequest
+    LLM_AVAILABLE = True
+except ImportError:
+    LLM_AVAILABLE = False
+    logging.warning("⚠️ Sistema LLM não disponível. Agentes funcionarão em modo básico.")
 
 
 @dataclass
@@ -133,6 +143,119 @@ class BaseAgent(ABC):
             Feedback sobre a solução
         """
         return await self._generate_review_response(solution, criteria)
+    
+    async def _generate_llm_response(
+        self, 
+        prompt: str, 
+        task_type: str = "analysis",
+        context: Optional[str] = None,
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None
+    ) -> str:
+        """
+        Gera resposta usando sistema LLM integrado
+        
+        Args:
+            prompt: Prompt para o LLM
+            task_type: Tipo de tarefa (analysis, collaboration, solution)
+            context: Contexto adicional
+            temperature: Temperatura para geração
+            max_tokens: Máximo de tokens
+            
+        Returns:
+            Resposta gerada pelo LLM
+        """
+        if not LLM_AVAILABLE:
+            return await self._generate_fallback_response(prompt, task_type)
+        
+        try:
+            # Criar requisição LLM
+            request = LLMRequest(
+                prompt=prompt,
+                agent_id=self.profile.agent_id,
+                context=context,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                use_cache=True,
+                priority="normal"
+            )
+            
+            # Gerar resposta
+            response = await llm_manager.generate_response(request)
+            
+            # Atualizar contexto
+            self.update_context(f"LLM response generated: {task_type}")
+            
+            # Log da interação
+            self.logger.debug(
+                f"LLM response: model={response.model_used}, "
+                f"tokens={response.tokens_used}, cost=${response.cost:.4f}"
+            )
+            
+            return response.content
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Erro no LLM, usando fallback: {e}")
+            return await self._generate_fallback_response(prompt, task_type)
+    
+    async def _generate_fallback_response(self, prompt: str, task_type: str) -> str:
+        """
+        Gera resposta de fallback quando LLM não está disponível
+        
+        Args:
+            prompt: Prompt original
+            task_type: Tipo de tarefa
+            
+        Returns:
+            Resposta de fallback
+        """
+        fallback_responses = {
+            "analysis": f"Como {self.profile.role}, analisaria este requisito considerando minha expertise em {', '.join(self.profile.expertise_areas[:2])}. Para uma análise mais detalhada, seria necessário acesso aos modelos de IA avançados.",
+            
+            "collaboration": f"Como {self.profile.role}, contribuiria com minha perspectiva em {', '.join(self.profile.skills[:2])}. A colaboração seria mais efetiva com o sistema LLM completo ativo.",
+            
+            "solution": f"Como {self.profile.role}, proporia uma solução baseada em minha experiência em {', '.join(self.profile.expertise_areas[:2])}. Uma proposta mais detalhada requereria o sistema LLM completo.",
+            
+            "expertise": f"Minha expertise em {', '.join(self.profile.expertise_areas)} me permite fornecer insights sobre este tópico. Para análise mais profunda, o sistema LLM seria necessário.",
+            
+            "review": f"Como {self.profile.role}, revisaria esta solução considerando {', '.join(self.profile.responsibilities[:2])}. Uma revisão mais completa requereria o sistema LLM ativo."
+        }
+        
+        return fallback_responses.get(task_type, f"Como {self.profile.role}, forneceria insights baseados em minha experiência profissional.")
+    
+    async def get_llm_health_status(self) -> Dict[str, Any]:
+        """
+        Retorna status de saúde do sistema LLM para este agente
+        
+        Returns:
+            Status de saúde do LLM
+        """
+        if not LLM_AVAILABLE:
+            return {
+                "status": "unavailable",
+                "message": "Sistema LLM não está disponível"
+            }
+        
+        try:
+            # Obter otimizações específicas do agente
+            optimization = await llm_manager.optimize_for_agent(
+                self.profile.agent_id, 
+                "analysis"
+            )
+            
+            return {
+                "status": "available",
+                "agent_id": self.profile.agent_id,
+                "optimization": optimization,
+                "llm_available": True
+            }
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": str(e),
+                "llm_available": False
+            }
     
     def update_context(self, interaction: str, collaborator: Optional[str] = None):
         """

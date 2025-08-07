@@ -1,0 +1,39 @@
+# CWB Hub LLM Integration Requirements
+# Melhoria #6 - Integração com Modelos de Linguagem
+
+# OpenAI
+openai>=1.12.0
+
+# Anthropic Claude
+anthropic>=0.18.0
+
+# Google Gemini
+google-generativeai>=0.4.0
+
+# Redis para cache
+redis>=5.0.0
+
+# Utilitários
+aiohttp>=3.9.0
+asyncio-throttle>=1.0.2
+tenacity>=8.2.0
+
+# Monitoramento e logging
+structlog>=23.2.0
+prometheus-client>=0.19.0
+
+# Validação e parsing
+pydantic>=2.5.0
+jsonschema>=4.20.0
+
+# Processamento de texto
+tiktoken>=0.6.0  # Para contagem de tokens OpenAI
+transformers>=4.36.0  # Para embeddings locais (opcional)
+
+# Análise de imagem (para Gemini Vision)
+Pillow>=10.2.0
+
+# Desenvolvimento e testes
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.12.0
