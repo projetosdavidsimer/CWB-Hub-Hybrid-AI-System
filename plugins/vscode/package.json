@@ -1,0 +1,182 @@
+{
+  "name": "cwb-hub-ai-assistant",
+  "displayName": "CWB Hub AI Assistant",
+  "description": "Equipe de 8 profissionais sênior de IA híbrida para consultoria técnica diretamente no seu IDE",
+  "version": "1.0.0",
+  "publisher": "cwb-hub",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/projetosdavidsimer/CWB-Hub-Hybrid-AI-System"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other",
+    "Machine Learning",
+    "Snippets",
+    "Education"
+  ],
+  "keywords": [
+    "ai",
+    "assistant",
+    "consulting",
+    "architecture",
+    "development",
+    "cwb-hub",
+    "hybrid-ai",
+    "team-collaboration"
+  ],
+  "activationEvents": [
+    "onCommand:cwb-hub.analyzeProject",
+    "onCommand:cwb-hub.askTeam",
+    "onCommand:cwb-hub.reviewCode",
+    "onCommand:cwb-hub.architectureAdvice"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cwb-hub.analyzeProject",
+        "title": "🏗️ Analisar Projeto",
+        "category": "CWB Hub"
+      },
+      {
+        "command": "cwb-hub.askTeam",
+        "title": "👥 Consultar Equipe",
+        "category": "CWB Hub"
+      },
+      {
+        "command": "cwb-hub.reviewCode",
+        "title": "🔍 Revisar Código",
+        "category": "CWB Hub"
+      },
+      {
+        "command": "cwb-hub.architectureAdvice",
+        "title": "🏛️ Consultoria Arquitetural",
+        "category": "CWB Hub"
+      },
+      {
+        "command": "cwb-hub.showTeam",
+        "title": "👨‍💼 Ver Equipe",
+        "category": "CWB Hub"
+      },
+      {
+        "command": "cwb-hub.settings",
+        "title": "⚙️ Configurações",
+        "category": "CWB Hub"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorHasSelection",
+          "command": "cwb-hub.reviewCode",
+          "group": "cwb-hub@1"
+        },
+        {
+          "command": "cwb-hub.askTeam",
+          "group": "cwb-hub@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "cwb-hub.analyzeProject",
+          "group": "cwb-hub@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "cwb-hub.analyzeProject"
+        },
+        {
+          "command": "cwb-hub.askTeam"
+        },
+        {
+          "command": "cwb-hub.reviewCode"
+        },
+        {
+          "command": "cwb-hub.architectureAdvice"
+        },
+        {
+          "command": "cwb-hub.showTeam"
+        },
+        {
+          "command": "cwb-hub.settings"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CWB Hub AI Assistant",
+      "properties": {
+        "cwb-hub.apiEndpoint": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "Endpoint da API do CWB Hub"
+        },
+        "cwb-hub.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Chave de API para autenticação"
+        },
+        "cwb-hub.autoAnalyze": {
+          "type": "boolean",
+          "default": false,
+          "description": "Analisar automaticamente arquivos ao abrir"
+        },
+        "cwb-hub.showNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Mostrar notificações da equipe CWB Hub"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "cwb-hub",
+          "title": "CWB Hub AI",
+          "icon": "$(organization)"
+        }
+      ]
+    },
+    "views": {
+      "cwb-hub": [
+        {
+          "id": "cwb-hub-team",
+          "name": "Equipe CWB Hub",
+          "when": "true"
+        },
+        {
+          "id": "cwb-hub-history",
+          "name": "Histórico de Consultas",
+          "when": "true"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.4",
+    "@vscode/test-electron": "^2.2.0",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "uuid": "^9.0.0"
+  }
+}

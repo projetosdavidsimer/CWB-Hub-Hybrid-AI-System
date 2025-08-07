@@ -46,9 +46,11 @@ src/
 │   └── pedro_henrique_almeida.py   # Project Manager
 ├── communication/
 │   └── collaboration_framework.py  # Framework de colaboração
-└── utils/
-    ├── requirement_analyzer.py     # Analisador de requisitos
-    └── response_synthesizer.py     # Sintetizador de respostas
+├── utils/
+│   ├── requirement_analyzer.py     # Analisador de requisitos
+│   └── response_synthesizer.py     # Sintetizador de respostas
+└── plugins/
+    └── vscode/                     # Plugin VSCode
 ```
 
 ## 🛠️ Instalação
@@ -117,7 +119,35 @@ pip install --only-binary=all -r requirements.txt
 
 ## 💡 Formas de Uso
 
-### 🖥️ Interface de Linha de Comando (CLI) - **NOVO!**
+### 🔌 Plugin VSCode - **NOVO!**
+
+Acesse a equipe CWB Hub diretamente no seu IDE favorito!
+
+```bash
+# Instalar o plugin
+code --install-extension plugins/vscode/cwb-hub-ai-assistant-1.0.0.vsix
+```
+
+**Funcionalidades do Plugin:**
+- 🏗️ **Analisar Projeto** - Análise completa de arquitetura
+- 👥 **Consultar Equipe** - Perguntas diretas aos 8 profissionais
+- 🔍 **Revisar Código** - Análise de qualidade e sugestões
+- 🏛️ **Consultoria Arquitetural** - Expertise especializada
+- 👨‍💼 **Ver Equipe** - Visualização dos 8 profissionais
+- ⚙️ **Configurações** - Setup de API e preferências
+
+**Como usar:**
+1. `Ctrl+Shift+P` → `CWB Hub: Consultar Equipe`
+2. Clique direito no código → `CWB Hub: Revisar Código`
+3. Sidebar → Ícone de organização → Equipe CWB Hub
+
+**Configuração:**
+- `Ctrl+,` → Procure "CWB Hub"
+- Configure `cwb-hub.apiEndpoint`: `http://localhost:8000`
+
+**📖 Documentação do Plugin**: [plugins/vscode/README.md](plugins/vscode/README.md)
+
+### 🖥️ Interface de Linha de Comando (CLI)
 
 ```bash
 # Consulta simples
@@ -180,6 +210,7 @@ python main.py
 - [x] Sistema de iteração e refinamento
 - [x] **Interface de linha de comando (CLI)** 🆕
 - [x] **Scripts auxiliares para Windows/Linux/macOS** 🆕
+- [x] **Plugin VSCode completo** 🆕
 - [x] **Documentação completa da CLI** 🆕
 - [x] Logging e monitoramento
 - [x] Exemplo de uso completo
@@ -198,7 +229,8 @@ python main.py
 - [ ] Sistema de aprendizado contínuo
 - [ ] API REST para integração
 - [ ] Dashboard de monitoramento
-- [ ] Plugins para IDEs
+- [ ] Plugin IntelliJ IDEA
+- [ ] Marketplace de integrações
 
 ## 🧪 Testes
 
