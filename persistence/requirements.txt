@@ -27,7 +27,7 @@ celery>=5.3.0
 # Development
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
-pytest-postgresql>=5.0.0
+# pytest-postgresql>=5.0.0  # Removido devido a conflitos com psycopg
 factory-boy>=3.3.0
 
 # Monitoring
