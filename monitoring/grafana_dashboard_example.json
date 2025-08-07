@@ -1,0 +1,43 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "CWB Hub API - Monitoramento",
+    "panels": [
+      {
+        "type": "graph",
+        "title": "Tempo de Resposta (ms)",
+        "targets": [
+          {
+            "expr": "http_request_duration_seconds_sum{job=\"cwb_hub_api\"} / http_request_duration_seconds_count{job=\"cwb_hub_api\"} * 1000",
+            "legendFormat": "Tempo Médio"
+          }
+        ],
+        "datasource": "Prometheus"
+      },
+      {
+        "type": "stat",
+        "title": "Disponibilidade",
+        "targets": [
+          {
+            "expr": "up{job=\"cwb_hub_api\"}",
+            "legendFormat": "API Up"
+          }
+        ],
+        "datasource": "Prometheus"
+      },
+      {
+        "type": "graph",
+        "title": "Requisições por Segundo",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"cwb_hub_api\"}[1m])",
+            "legendFormat": "RPS"
+          }
+        ],
+        "datasource": "Prometheus"
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

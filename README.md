@@ -115,7 +115,35 @@ python main.py
 pip install --only-binary=all -r requirements.txt
 ```
 
-## 💡 Exemplo de Uso
+## 💡 Formas de Uso
+
+### 🖥️ Interface de Linha de Comando (CLI) - **NOVO!**
+
+```bash
+# Consulta simples
+python cwb_cli.py query "Como criar um app mobile para e-commerce?"
+
+# Consulta a partir de arquivo
+python cwb_cli.py query --file requisitos.txt --output resposta.md
+
+# Listar agentes ativos
+python cwb_cli.py agents
+
+# Verificar status do sistema
+python cwb_cli.py status
+
+# Iterar uma solução existente
+python cwb_cli.py iterate "Preciso reduzir o orçamento" --session abc123
+
+# Scripts auxiliares
+./cwb.sh query "Sua pergunta"     # Linux/macOS
+cwb.bat query "Sua pergunta"      # Windows
+```
+
+**📖 Documentação CLI Completa**: [CLI_GUIDE.md](CLI_GUIDE.md)  
+**⚡ Referência Rápida**: [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+
+### 🐍 API Python
 
 ```python
 from src.core.hybrid_ai_orchestrator import HybridAIOrchestrator
@@ -133,6 +161,13 @@ feedback = "Gostei da proposta, mas o orçamento é limitado..."
 refined_response = await orchestrator.iterate_solution(session_id, feedback)
 ```
 
+### 🎯 Exemplo Interativo
+
+```bash
+# Execute o exemplo completo
+python main.py
+```
+
 ## 🔧 Funcionalidades
 
 ### ✅ Implementado
@@ -143,6 +178,9 @@ refined_response = await orchestrator.iterate_solution(session_id, feedback)
 - [x] Analisador inteligente de requisitos
 - [x] Sintetizador de respostas integradas
 - [x] Sistema de iteração e refinamento
+- [x] **Interface de linha de comando (CLI)** 🆕
+- [x] **Scripts auxiliares para Windows/Linux/macOS** 🆕
+- [x] **Documentação completa da CLI** 🆕
 - [x] Logging e monitoramento
 - [x] Exemplo de uso completo
 

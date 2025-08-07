@@ -1,0 +1,7 @@
+# Prometheus config para monitorar CWB Hub Hybrid AI System
+
+scrape_configs:
+  - job_name: 'cwb_hub_api'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['cwb_api:8000']

@@ -4,7 +4,7 @@ CWB Hub Persistence System - Database Connection
 Configuração e gerenciamento de conexões com PostgreSQL
 """
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
@@ -19,11 +19,11 @@ logger = logging.getLogger(__name__)
 
 # Configurações do banco de dados
 DATABASE_CONFIG = {
-    "host": os.getenv("DB_HOST", "localhost"),
+    "host": os.getenv("DB_HOST", "127.0.0.1"),
     "port": os.getenv("DB_PORT", "5432"),
     "database": os.getenv("DB_NAME", "cwb_hub"),
     "username": os.getenv("DB_USER", "cwb_user"),
-    "password": os.getenv("DB_PASSWORD", "cwb_password"),
+    "password": os.getenv("DB_PASSWORD", "cwb123"),
 }
 
 # URLs de conexão
@@ -137,7 +137,7 @@ def test_connection() -> bool:
     """Testa a conexão com o banco de dados"""
     try:
         with get_db_session() as session:
-            session.execute("SELECT 1")
+            session.execute(text("SELECT 1"))
         logger.info("✅ Conexão com banco de dados testada com sucesso")
         return True
     except Exception as e:
@@ -149,7 +149,7 @@ async def test_async_connection() -> bool:
     """Testa a conexão assíncrona com o banco de dados"""
     try:
         async with get_async_db_session() as session:
-            await session.execute("SELECT 1")
+            await session.execute(text("SELECT 1"))
         logger.info("✅ Conexão assíncrona com banco de dados testada com sucesso")
         return True
     except Exception as e:
@@ -195,7 +195,7 @@ def health_check() -> dict:
     """Verifica a saúde da conexão com o banco"""
     try:
         with get_db_session() as session:
-            result = session.execute("SELECT version(), current_database(), current_user")
+            result = session.execute(text("SELECT version(), current_database(), current_user"))
             version, database, user = result.fetchone()
             
             # Estatísticas do pool
@@ -205,8 +205,7 @@ def health_check() -> dict:
                 "checked_in": pool.checkedin(),
                 "checked_out": pool.checkedout(),
                 "overflow": pool.overflow(),
-                "invalid": pool.invalid(),
-            }
+                            }
             
             return {
                 "status": "healthy",

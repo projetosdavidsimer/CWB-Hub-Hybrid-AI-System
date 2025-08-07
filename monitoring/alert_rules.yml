@@ -1,0 +1,22 @@
+# Alertas Prometheus para CWB Hub Hybrid AI System
+
+groups:
+  - name: cwb_hub_alerts
+    rules:
+      - alert: APIIndisponivel
+        expr: up{job="cwb_hub_api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API do CWB Hub está indisponível"
+          description: "A API não está respondendo há mais de 1 minuto."
+
+      - alert: AltaLatencia
+        expr: (http_request_duration_seconds_sum{job="cwb_hub_api"} / http_request_duration_seconds_count{job="cwb_hub_api"}) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alta latência na API do CWB Hub"
+          description: "O tempo médio de resposta está acima de 500ms por mais de 2 minutos."

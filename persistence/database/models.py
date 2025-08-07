@@ -158,7 +158,7 @@ class Agent(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relacionamentos
-    collaborations = relationship("Collaboration", back_populates="agent")
+    collaborations = relationship("Collaboration", back_populates="agent", foreign_keys="[Collaboration.agent_id]")
     
     # Índices
     __table_args__ = (
@@ -184,7 +184,7 @@ class Collaboration(Base):
     session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False)
     session = relationship("Session", back_populates="collaborations")
     agent_id = Column(Integer, ForeignKey("agents.id"), nullable=False)
-    agent = relationship("Agent", back_populates="collaborations")
+    agent = relationship("Agent", back_populates="collaborations", foreign_keys=[agent_id])
     
     # Colaboração com outro agente (opcional)
     collaborator_agent_id = Column(Integer, ForeignKey("agents.id"))
@@ -290,8 +290,24 @@ def create_tables(engine):
 
 
 # Função para popular dados iniciais
-def populate_initial_data(session):
+def populate_initial_data(engine):
     """Popula dados iniciais (agentes)"""
+    from sqlalchemy.orm import sessionmaker
+    
+    SessionLocal = sessionmaker(bind=engine)
+    session = SessionLocal()
+    
+    try:
+        _populate_agents(session)
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
+
+def _populate_agents(session):
+    """Função auxiliar para popular agentes"""
     
     agents_data = [
         {
